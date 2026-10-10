@@ -45,7 +45,7 @@ export class TeamPanel {
     document.body.classList.toggle('team-open', this.open && !s.complete);
     if (!this.open) return;
     const sug = t.crew.map((m) => t.suggestion(m)?.id ?? '-').join(',');
-    const sig = [crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '')).slice(0, 8).join(',')].join(';');
+    const sig = [crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '') + (i.text?.length ?? 0)).slice(0, 8).join(',')].join(';');
     if (sig === this.sig) return;
     this.sig = sig; this.render();
   }

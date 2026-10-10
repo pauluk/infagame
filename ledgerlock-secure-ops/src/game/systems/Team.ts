@@ -46,7 +46,12 @@ export interface TeamOptions {
   spawn: Cell[];
   body?: ExternalBody;
   autoDecide: () => boolean;
+  /** JEV second opinion (optional). When it is on, choices go to JEV first; teammates only act on it when it is confident. */
+  jevOn?: () => boolean;
+  advise?: (spec: Extract<DialogSpec, { type: 'choice' }>) => Promise<{ id: string; confidence: number } | null>;
 }
+/** How sure JEV must be before a teammate acts on its answer without asking the manager. */
+export const JEV_GATE = 0.75;
 
 /** Team and Auto-play. Pure game logic: teammates walk the grid, then use the same MissionRunner a player does. */
 export class TeamController {
@@ -150,6 +155,7 @@ export class TeamController {
     const mission = this.s.mission;
     switch (spec.type) {
       case 'choice': {
+        if (this.opts.jevOn?.() && this.opts.advise) { this.askJev(m, spec, auto); return true; }
         if (auto) { this.postReport(m, spec.title, `${m.name} chose the best-practice answer.`); spec.onChoose(mission.bestChoice?.[spec.title] ?? spec.options[0].id); return true; }
         this.ask(m, spec.title, 'Needs your call', { ...spec, onChoose: (id) => { it.resolved = true; if (m.pending === it) m.pending = null; spec.onChoose(id); } });
         const it = this.inbox[this.inbox.length - 1];
@@ -165,6 +171,25 @@ export class TeamController {
       case 'timeline': { const { onClose, ...rest } = spec; this.postReport(m, spec.title, spec.conclusion, rest); onClose?.(); return true; }
       default: return true;                                    // alert / board / goals / access: nothing to ask of anyone
     }
+  }
+  /** Confidence-gated routing: JEV answers; the teammate acts only when it is sure and Auto may decide, otherwise it asks the manager. */
+  private askJev(m: Member, spec: Extract<DialogSpec, { type: 'choice' }>, auto: boolean): void {
+    const it: InboxItem = { id: ++this.seq, member: m.name, kind: 'decision', title: spec.title, text: 'Asking JEV for a second opinion…', t: this.s.fmtClock() };
+    const done = (id: string) => { it.resolved = true; if (m.pending === it) m.pending = null; spec.onChoose(id); };
+    it.spec = { ...spec, onChoose: done };
+    this.push(it); m.pending = it;
+    const label = (id: string) => spec.options.find((o) => o.id === id)?.label ?? id;
+    void this.opts.advise!(spec).then((r) => {
+      if (it.resolved) return;
+      const best = this.s.mission.bestChoice?.[spec.title];
+      if (r) {
+        const pct = Math.round(r.confidence * 100);
+        if (auto && r.confidence >= JEV_GATE) { this.s.stats.jevFollowed++; this.postReport(m, spec.title, `Followed JEV: "${label(r.id)}" (${pct}% sure).`); done(r.id); return; }
+        it.text = `JEV suggests "${label(r.id)}" (${pct}% sure).${auto ? ' Not sure enough to act alone: your call.' : ' Your call.'}`;
+      } else if (auto && best) { this.postReport(m, spec.title, `JEV was unavailable, so ${m.name} used the playbook answer.`); done(best); return; }
+      else it.text = 'JEV is unavailable right now. Your call.';
+      this.s.log(`${m.name}: ${spec.title}: ${it.text}`, 'warn'); this.s.changed();
+    });
   }
   private ask(m: Member, title: string, text: string, spec: DialogSpec): void {
     const it: InboxItem = { id: ++this.seq, member: m.name, kind: 'decision', title, text, t: this.s.fmtClock(), spec };

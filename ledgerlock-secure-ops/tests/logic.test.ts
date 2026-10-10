@@ -399,3 +399,82 @@ describe('team mode and auto-play', () => {
     expect(out.goals.stretch).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------- JEV (server adapter and teammate routing) ----
+import { handleJev, buildRequest } from '../server/jevHandler.mjs';
+import { JEV_GATE } from '../src/game/systems/Team';
+
+describe('JEV server adapter', () => {
+  const opts = [{ id: 'bug', label: 'Software bug', detail: 'A retry fault' }, { id: 'malware', label: 'Malware', detail: 'Hostile code' }];
+  const decision = { kind: 'decision', title: 'Diagnosis', body: 'What is it?', options: opts, context: 'receipt twice' };
+  const upstream = (answers: object, status = 200) => async (_u: string, init: any) => { upstream.last = { url: _u, init }; return { ok: status < 400, status, json: async () => ({ model: 'jev-1.13.0', answers }) } as any; };
+  upstream.last = null as any;
+  it('is "not configured" without a real key (placeholder values do not count) and never echoes the key', async () => {
+    expect((await handleJev({ method: 'GET', env: {} })).json).toMatchObject({ configured: false });
+    expect((await handleJev({ method: 'GET', env: { TYPESAFE_API_KEY: 'replace-me' } })).json).toMatchObject({ configured: false });
+    expect((await handleJev({ method: 'POST', body: decision, env: {} })).status).toBe(503);
+    const ok = await handleJev({ method: 'GET', env: { TYPESAFE_API_KEY: 'sk-secret-123' } });
+    expect(JSON.stringify(ok.json)).not.toContain('sk-secret-123');
+  });
+  it('sends a documented System One request with Bearer auth and returns only the useful fields', async () => {
+    const f = upstream({ best: { type: 'choice', choice: 'bug', confidence: 0.91, probabilities: { bug: 0.91, malware: 0.09 } } });
+    const r = await handleJev({ method: 'POST', body: decision, ip: 't1', env: { TYPESAFE_API_KEY: 'sk-secret-123' }, fetchImpl: f as any });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ choice: 'bug', confidence: 0.91, model: 'jev-1.13.0' });
+    expect(JSON.stringify(r.json)).not.toContain('sk-secret-123');
+    const sent = upstream.last; const body = JSON.parse(sent.init.body);
+    expect(sent.url).toBe('https://api.typesafe.ai/v1/systemone');
+    expect(sent.init.headers.Authorization).toBe('Bearer sk-secret-123');
+    expect(body.model).toBe('jev-latest'); expect(body.questions.best.type).toBe('choice'); expect(Object.keys(body.questions.best.criteria)).toEqual(['bug', 'malware']);
+    expect(body.state).toContain('receipt twice');
+  });
+  it('only accepts the two question templates, with bounded input (not an open proxy)', async () => {
+    expect(buildRequest({ kind: 'raw', url: 'https://evil.example' })).toMatchObject({ error: 'bad_request' });
+    expect(buildRequest({ kind: 'decision', options: [opts[0]] })).toMatchObject({ error: 'bad_request' });
+    const big = buildRequest({ ...decision, body: 'x'.repeat(50000), context: 'y'.repeat(50000) }) as any;
+    expect(big.payload.state.length).toBeLessThan(6500);
+    const s = buildRequest({ kind: 'supports', claim: 'The retry is the cause', context: 'c' }) as any;
+    expect(s.payload.questions.supported.type).toBe('noul');
+  });
+  it('turns upstream failures into safe errors', async () => {
+    const env = { TYPESAFE_API_KEY: 'sk-secret-123' };
+    expect((await handleJev({ method: 'POST', body: decision, ip: 't2', env, fetchImpl: upstream({}, 401) as any })).json).toMatchObject({ error: 'key_rejected' });
+    expect((await handleJev({ method: 'POST', body: decision, ip: 't3', env, fetchImpl: upstream({}, 529) as any })).status).toBe(429);
+    const boom = (async () => { throw new Error('sk-secret-123 leaked in message'); }) as any;
+    const r = await handleJev({ method: 'POST', body: decision, ip: 't4', env, fetchImpl: boom });
+    expect(r.status).toBe(502); expect(JSON.stringify(r.json)).not.toContain('sk-secret');
+  });
+});
+
+describe('teammates and JEV (confidence-gated routing)', () => {
+  const tick = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+  function setup(advice: { id: string; confidence: number } | null, auto: boolean) {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    const room = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+    const team = new TeamController(s, run, { team: true, spawn: [nearestWalkable(walk, room.x0 + 4, room.y0 + 4, 4)!], autoDecide: () => auto, jevOn: () => true, advise: async () => advice });
+    const modal: any[] = []; s.on('dialog', (d) => modal.push(d));
+    // put the mission right at the diagnosis question
+    Object.assign(s.flags, { briefed: true, scannedTerminal: true, receiptEvidence: true, lensed: true }); s.evidence.add('ev_masked_receipt');
+    return { s, run, team, modal, m };
+  }
+  const ask = (t: any, s: any, run: any) => { t.acting = t.members[1]; run.api.dialog({ type: 'choice', title: 'Diagnosis: what are we dealing with?', body: 'b', options: [{ id: 'bug', label: 'Software bug', detail: 'd' }, { id: 'malware', label: 'Malware', detail: 'd' }], onChoose: (id: string) => { if (id === 'bug') s.flags.diagnosed = true; } }); t.acting = null; };
+  it('acts on a confident JEV answer when Auto may decide, and counts it', async () => {
+    const { s, run, team } = setup({ id: 'bug', confidence: 0.93 }, true); ask(team, s, run); await tick();
+    expect(s.flags.diagnosed).toBe(true); expect(s.stats.jevFollowed).toBe(1); expect(team.inbox.some((i) => i.kind === 'decision' && !i.resolved)).toBe(false);
+  });
+  it('does not act alone when JEV is unsure: it asks the manager and shows JEV\'s lean', async () => {
+    const { s, run, team } = setup({ id: 'bug', confidence: JEV_GATE - 0.2 }, true); ask(team, s, run); await tick();
+    expect(s.flags.diagnosed).toBeFalsy();
+    const it = team.inbox.find((i) => i.kind === 'decision' && !i.resolved)!;
+    expect(it.text).toMatch(/JEV suggests "Software bug".*Not sure enough/);
+  });
+  it('never acts alone when the manager keeps the calls, even if JEV is sure', async () => {
+    const { s, run, team } = setup({ id: 'bug', confidence: 0.99 }, false); ask(team, s, run); await tick();
+    expect(s.flags.diagnosed).toBeFalsy(); expect(team.inbox.find((i) => i.kind === 'decision' && !i.resolved)!.text).toMatch(/Your call/);
+  });
+  it('falls back to the playbook answer when JEV is unreachable and Auto may decide', async () => {
+    const { s, run, team } = setup(null, true); ask(team, s, run); await tick();
+    expect(s.flags.diagnosed).toBe(true);
+  });
+});

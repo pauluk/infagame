@@ -3,6 +3,7 @@ import { C, PALETTE, TILE_H, TILE_W, type PaletteKey } from '../constants';
 import { ATLAS_GROUPS, hasFrame, makeImage } from '../art';
 import { depthOf, findPath, guideToRoom, nearestReachable, nearestWalkable, toGrid, toScreen, walkableFor } from '../systems/Grid';
 import { reachRange } from '../systems/Reach';
+import { jev } from '../../integrations/jev/JevClient';
 import { TeamController, type ExternalBody, type Member } from '../systems/Team';
 import { FlowRenderer } from '../systems/FlowRenderer';
 import { GameState } from '../systems/GameState';
@@ -240,7 +241,9 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       walkTo: (c) => this.walkTo(c), idle: () => !this.to && !this.path.length,
       cancel: () => { this.path = []; }, pose: (t) => this.setPoseFor(t),
     };
-    this.team = new TeamController(this.state, this.runner, { team: settings.data.team, spawn, body, autoDecide: () => settings.data.autoDecide });
+    this.team = new TeamController(this.state, this.runner, { team: settings.data.team, spawn, body, autoDecide: () => settings.data.autoDecide,
+      jevOn: () => jev.enabled,
+      advise: async (spec) => { const r = await jev.decide(this.state, spec.title, spec.body, spec.options); return r ? { id: r.choice, confidence: r.confidence } : null; } });
     this.unsub.push(() => this.team.dispose());
     for (const m of this.team.members) {
       if (m.external) continue;

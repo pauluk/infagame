@@ -15,7 +15,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # tsc --noEmit + vite build
 npm run preview    # serve the production build on http://localhost:4173
-npm run test       # 54 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
+npm run test       # 62 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
 npm run typecheck  # tsc --noEmit
 npm run test:e2e   # real-browser playthrough of the tutorial (needs `npm run preview` running and Playwright); also tests/e2e-campaign.mjs
 npm run assets:render   # OPTIONAL: re-render all sprites with Blender (see docs/art-pipeline.md)
@@ -56,6 +56,9 @@ Pick **Tutorial Mode** on the title screen (or tick it in the briefing, Settings
 - **Stuck teammates** say why (a pass the clue does not yet justify, a step that comes first) instead of guessing.
 - Fairness: stretch goals are earned by hand, so they are not counted for any run in which Auto did an action (shown in the debrief). Everything else is scored normally.
 - Keyboard: **T** shows or hides the panel.
+
+### JEV second opinions (optional)
+Turn on **JEV** in Settings (it needs `TYPESAFE_API_KEY` on the server) to ask TypeSafe AI's JEV model for a second opinion on a decision; teammates on Auto consult it too and only act alone when it is confident. See `docs/jev.md`.
 
 ## Campaign and missions
 

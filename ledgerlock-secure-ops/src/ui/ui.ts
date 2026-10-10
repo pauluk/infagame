@@ -19,6 +19,7 @@ import { $, $$, el, esc, toneIcon } from './dom';
 import { loadToolIcons } from './icons';
 import { COACH } from '../data/coach';
 import { TeamPanel } from './teamPanel';
+import { jev, type JevChoice } from '../integrations/jev/JevClient';
 import type { FabricSnapshot } from '../integrations/fabric';
 
 const SEEN_KEY = 'ledgerlock.tutorialSeen';
@@ -166,6 +167,7 @@ export class UI {
     const access = `<h3>Accessibility</h3>
       ${sw('s-motion', 'Reduced motion', 'Stops pulses, shakes and bobbing. Route direction stays visible with arrows.', d.reducedMotion)}
       ${sw('s-tut', 'Tutorial mode', 'Guided coaching: a step-by-step coach, a beacon on the target, free hints and slower incidents. Stretch goals are not counted.', d.tutorial)}
+      <div class="sw"><label for="s-jev">JEV second opinions (AI)<small id="jev-state">Checking the server\u2026</small></label><input id="s-jev" type="checkbox" ${d.jev ? 'checked' : ''} style="width:22px;height:22px"></div>
       ${sw('s-team', 'Manager mode', 'Three teammates join the shift. You order them (or put them on Auto). Applies to the current and later missions.', d.team)}
       ${sw('s-decide', 'Auto makes the calls', 'Teammates and Auto-play pick the best-practice answer to a choice or confirmation instead of asking you.', d.autoDecide)}
       ${sw('s-relaxed', 'Relaxed pace', 'Incidents progress at half speed.', d.relaxed)}
@@ -176,6 +178,13 @@ export class UI {
     q('s-mute')?.addEventListener('change', (e) => settings.set('muted', (e.target as HTMLInputElement).checked));
     q('s-motion')?.addEventListener('change', (e) => settings.set('reducedMotion', (e.target as HTMLInputElement).checked));
     q('s-tut')?.addEventListener('change', (e) => settings.set('tutorial', (e.target as HTMLInputElement).checked));
+    const refreshJev = () => {
+      const box = q('s-jev'), note = s.querySelector('#jev-state'); if (!box || !note) return;
+      const text: Record<string, string> = { ready: 'JEV (TypeSafe AI) is available. When on, you can ask it for a second opinion on a decision, and teammates on Auto consult it (acting alone only when it is confident). It is advice only.', not_configured: 'Not set up on this server: the owner needs to add TYPESAFE_API_KEY. The game works the same without it.', unavailable: 'The JEV service could not be reached. The game works the same without it.', checking: 'Checking the server\u2026', unknown: 'Checking the server\u2026' };
+      note.textContent = text[jev.status]; box.disabled = jev.status !== 'ready'; if (jev.status !== 'ready') box.checked = false;
+    };
+    refreshJev(); jev.on('change', refreshJev); void jev.check();
+    q('s-jev')?.addEventListener('change', (e) => settings.set('jev', (e.target as HTMLInputElement).checked));
     q('s-team')?.addEventListener('change', (e) => settings.set('team', (e.target as HTMLInputElement).checked));
     q('s-decide')?.addEventListener('change', (e) => settings.set('autoDecide', (e.target as HTMLInputElement).checked));
     q('s-relaxed')?.addEventListener('change', (e) => settings.set('relaxed', (e.target as HTMLInputElement).checked));
@@ -246,8 +255,10 @@ export class UI {
       ${m.briefing.map((b) => `<p>${esc(b)}</p>`).join('')}
       <div class="sw"><label for="b-tut">Tutorial mode (guided coaching)<small>A coach explains each step and points at the target. Hints are free and incidents run slower.</small></label><input id="b-tut" type="checkbox" ${settings.data.tutorial ? 'checked' : ''} style="width:22px;height:22px"></div>
       <div class="sw"><label for="b-team">Manager mode (lead a team)<small>Three teammates join you. Order them, or put anyone (including yourself) on Auto. Auto-play shows a mission being solved: stretch goals are earned by hand.</small></label><input id="b-team" type="checkbox" ${settings.data.team ? 'checked' : ''} style="width:22px;height:22px"></div>
+      ${jev.status === 'ready' ? `<div class="sw"><label for="b-jev">JEV second opinions (AI)<small>Ask JEV (TypeSafe AI) for advice on a decision. It never decides for you unless you let Auto act on it.</small></label><input id="b-jev" type="checkbox" ${settings.data.jev ? 'checked' : ''} style="width:22px;height:22px"></div>` : ''}
       <div class="row" style="margin-top:12px"><button class="primary" data-a="go">Begin investigation</button><button data-a="how">How to play</button></div></div>`);
     (s.querySelector('#b-tut') as HTMLInputElement).addEventListener('change', (e) => settings.set('tutorial', (e.target as HTMLInputElement).checked));
+    (s.querySelector('#b-jev') as HTMLInputElement | null)?.addEventListener('change', (e) => settings.set('jev', (e.target as HTMLInputElement).checked));
     (s.querySelector('#b-team') as HTMLInputElement).addEventListener('change', (e) => { settings.set('team', (e.target as HTMLInputElement).checked); this.scene?.team.setCrew(settings.data.team); });
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
@@ -293,7 +304,7 @@ export class UI {
     const next = MISSIONS.filter((x) => x.order > 0).find((x) => x.order === m.order + 1);
     const evRows = m.evidence.map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(ROOM_BY_ID[e.sourceRoom].name)}</td><td>${esc(PASSES[e.requiredPass].name)}</td><td>${esc(e.sensitivity)}</td><td>${state.evidence.has(e.id) ? '<span class="chip good">✓ Collected</span>' : '<span class="chip">○ Missing</span>'}</td></tr>`).join('');
     const s = this.showScreen(`<div class="card wide"><div class="row" style="align-items:flex-start;gap:20px">
-      <div style="flex:1;min-width:280px"><div class="chip good">Mission complete</div>${state.tutorial ? ' <span class="chip info">Tutorial mode: stretch goals not counted</span>' : ''}${state.stats.autoActions ? ` <span class="chip info">Auto did ${state.stats.autoActions} action(s)${state.stats.orders ? `, you ordered ${state.stats.orders}` : ''}: stretch goals not counted</span>` : state.stats.orders ? ` <span class="chip info">Manager mode: you ordered ${state.stats.orders} action(s)</span>` : ''}<h2 style="margin-top:6px">${esc(m.title)}: debrief</h2>
+      <div style="flex:1;min-width:280px"><div class="chip good">Mission complete</div>${state.tutorial ? ' <span class="chip info">Tutorial mode: stretch goals not counted</span>' : ''}${state.stats.jevCalls ? ` <span class="chip info">JEV consulted ${state.stats.jevCalls} time(s)${state.stats.jevFollowed ? `, followed ${state.stats.jevFollowed}` : ''}</span>` : ''}${state.stats.autoActions ? ` <span class="chip info">Auto did ${state.stats.autoActions} action(s)${state.stats.orders ? `, you ordered ${state.stats.orders}` : ''}: stretch goals not counted</span>` : state.stats.orders ? ` <span class="chip info">Manager mode: you ordered ${state.stats.orders} action(s)</span>` : ''}<h2 style="margin-top:6px">${esc(m.title)}: debrief</h2>
         ${m.order === 0 ? `<div class="score">${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}<span style="font-size:.35em;opacity:.8"> / 6 side tasks</span></div><div class="sub">Operations hygiene</div><p>Small habits prevent the next incident. Nothing here affects campaign progress.</p>` : `<div class="score">${score.total}<span style="font-size:.35em;opacity:.8"> / 100</span></div><div class="sub">${esc(score.rating)}</div><p>${esc(score.message)}</p>`}
         <h3>Objectives</h3><div class="small"><b>Primary</b></div><ul class="goals">${goalRows('primary') || '<li>None: this is a free-roam shift.</li>'}</ul>
         <div class="small"><b>Optional</b> (${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}/${m.goals.filter((g) => g.kind === 'optional').length})</div><ul class="goals">${goalRows('optional')}</ul>
@@ -320,7 +331,7 @@ export class UI {
   private buildHud(): void {
     const hud = el('div', { id: 'hudroot' }, `
       <div id="hud"><div class="hud-row" id="meters"></div><div class="hud-row"><div id="objective" role="status" aria-live="polite"></div>
-        <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-team" title="Team and Auto-play (T)">\u23F5 Auto</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
+        <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-jev" class="hidden" title="JEV second opinions (AI) on or off" aria-pressed="false">JEV</button><button id="b-team" title="Team and Auto-play (T)">\u23F5 Auto</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
       <div id="tooltip"></div><div id="coach" class="hidden" role="region" aria-label="Tutorial coach"></div><div id="team" class="hidden" role="region" aria-label="Team and Auto-play"></div>
       <div id="belt" role="toolbar" aria-label="Tool belt"></div>
       <div id="inspect" class="open"></div>
@@ -339,6 +350,7 @@ export class UI {
     $(hud, '#b-log')!.onclick = () => this.openPanel('log');
     $(hud, '#b-pause')!.onclick = () => this.togglePause();
     $(hud, '#b-mute')!.onclick = () => settings.set('muted', !settings.data.muted);
+    $(hud, '#b-jev')!.onclick = () => settings.set('jev', !settings.data.jev);
     $(hud, '#b-routes')!.onclick = (e) => { const v = !this.scene!.routesVisible(); this.scene!.setRoutesVisible(v); (e.currentTarget as HTMLElement).setAttribute('aria-pressed', String(v)); };
     $(hud, '#mm-ret')!.onclick = () => this.scene!.returnToPlayer();
     $(hud, '#mm-zi')!.onclick = () => this.scene!.zoomBy(0.2);
@@ -352,7 +364,9 @@ export class UI {
     });
     $(hud, '#mm')!.addEventListener('click', (e) => this.minimapClick(e as MouseEvent));
     $(hud, '#legend')!.innerHTML = [['cyan', 'API / events'], ['blue', 'Outbound payments'], ['mint', 'Card / return'], ['violet', 'Debt / agency'], ['periwinkle', 'Fabric analytics'], ['amber', 'Needs investigation'], ['coral', 'Confirmed threat']].map(([c, l]) => `<span><i style="background:${COLOR_HEX[c]}"></i>${l}</span>`).join('');
-    settings.on('change', () => { if (this.state) { this.state.tutorial = settings.data.tutorial; this.scene?.team?.setCrew(settings.data.team); this.dirty = true; } const b = $(hud, '#b-mute'); if (b) b.textContent = settings.data.muted ? '♪✕' : '♪'; });
+    const syncJev = () => { const b = $(hud, '#b-jev'); if (!b) return; b.classList.toggle('hidden', jev.status !== 'ready'); b.setAttribute('aria-pressed', String(settings.data.jev)); b.classList.toggle('on', settings.data.jev); b.textContent = settings.data.jev ? 'JEV \u2713' : 'JEV'; };
+    jev.on('change', syncJev); void jev.check(); syncJev();
+    settings.on('change', () => { syncJev(); if (this.state) { this.state.tutorial = settings.data.tutorial; this.scene?.team?.setCrew(settings.data.team); this.dirty = true; } const b = $(hud, '#b-mute'); if (b) b.textContent = settings.data.muted ? '♪✕' : '♪'; });
     this.applySettings();
   }
 
@@ -637,8 +651,24 @@ export class UI {
         break;
       }
       case 'choice': {
-        card(`<h2>${esc(d.title)}</h2><p>${esc(d.body)}</p><div class="options">${d.options.map((o) => `<button data-o="${o.id}"><b>${esc(o.label)}</b><small>${esc(o.detail)}</small></button>`).join('')}</div>`);
-        wrap.onclick = (e) => { const o = (e.target as HTMLElement).closest('button')?.dataset.o; if (o) close(() => d.onChoose(o)); };
+        const canJev = jev.enabled && !!this.state;
+        card(`<h2>${esc(d.title)}</h2><p>${esc(d.body)}</p><div class="options">${d.options.map((o) => `<button data-o="${o.id}"><b>${esc(o.label)}</b><small>${esc(o.detail)}</small><span class="jv" data-jv="${o.id}"></span></button>`).join('')}</div>
+          ${canJev ? '<div class="jevrow"><button data-j="ask">Ask JEV for a second opinion</button><span id="jev-note" class="small" role="status" aria-live="polite"></span></div>' : ''}`);
+        let lean: JevChoice | null = null;
+        wrap.onclick = async (e) => {
+          const t = e.target as HTMLElement, btn = t.closest('button');
+          if (btn?.dataset.j === 'ask') {
+            const note = $(wrap, '#jev-note')!; (btn as HTMLButtonElement).disabled = true; note.textContent = 'JEV is thinking…';
+            lean = await jev.decide(this.state!, d.title, d.body, d.options);
+            (btn as HTMLButtonElement).disabled = false;
+            if (!lean) { note.textContent = 'JEV could not be reached. The choice is yours (the game works the same without it).'; return; }
+            const name = d.options.find((o) => o.id === lean!.choice)?.label ?? lean.choice;
+            note.innerHTML = `JEV leans to <b>${esc(name)}</b> (${Math.round(lean.confidence * 100)}% sure). Advice only: you decide, and a wrong answer here costs nothing.`;
+            for (const o of d.options) { const sp = $(wrap, `[data-jv="${o.id}"]`); if (sp) sp.textContent = `JEV: ${Math.round((lean.probabilities[o.id] ?? 0) * 100)}%${o.id === lean.choice ? ' \u2605 leans here' : ''}`; }
+            return;
+          }
+          const o = btn?.dataset.o; if (o) close(() => { if (lean && lean.choice === o) this.state!.stats.jevFollowed++; d.onChoose(o); });
+        };
         break;
       }
       case 'info': {

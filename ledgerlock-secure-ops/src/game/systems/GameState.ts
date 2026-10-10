@@ -54,7 +54,7 @@ export class GameState extends Emitter<StateEvents> {
   elapsed = 0;
   logEntries: LogEntry[] = [];
   scoreEvents: ScoreEvent[] = [];
-  stats = { autoActions: 0, orders: 0, toolUses: 0, unnecessary: 0, availSum: 0, availTime: 0, minAvail: 100, hintsUsed: 0, passDenials: 0, maskedOnly: true };
+  stats = { jevCalls: 0, jevFollowed: 0, autoActions: 0, orders: 0, toolUses: 0, unnecessary: 0, availSum: 0, availTime: 0, minAvail: 100, hintsUsed: 0, passDenials: 0, maskedOnly: true };
   selectedTool: ToolId = 'scanner';
   selectedTarget: string | null = null;
   paused = false;

@@ -220,3 +220,7 @@ body.tutorial-on #inspect { max-height: calc(100vh - 380px); }
 
 body.team-open #passes, body.team-open #legend { display: none; }
 @media (max-width: 560px) { body.team-open #minimap-wrap { display: none; } }
+
+/* ---- JEV ---- */
+#b-jev.on { border-color: var(--mint); } .options .jv { display: block; font-size: .85em; color: var(--cyan); margin-top: 2px; }
+.jevrow { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
