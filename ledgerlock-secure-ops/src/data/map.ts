@@ -91,6 +91,7 @@ const SPECS: RoomSpec[] = [
     ['access_desk', 'i_console_ops', 2, 6, 'Access Desk', 'Request fictional, read-only, mission-scoped passes.'],
     ['map_table', 'i_table_map', 7, 6, 'Facility Map Table', 'A tiny holographic facility. Press M for the minimap.'],
     ['log_terminal', 'i_terminal_cyan', 4, 6, 'Incident Log Terminal', 'The synthetic incident log: close stale entries and redact sensitive-looking values.'],
+    ['identity_desk', 'i_console_ops', 3, 3, 'Identity & Access Desk', 'A staffed terminal for access requests, service access forms and access reviews. A game simulation: every person and permission is fictional.'],
     ['comms_console', 'i_terminal_blue', 5, 6, 'Communications Console', 'Calls to platform teams and the on-call rota (simulated; nothing real is contacted).'],
     ['coffee', 'i_coffee', 8, 1, 'Coffee Machine', 'Powers Secure Ops. Officially "infrastructure".', false],
     ['sofa', 'd_sofa', 1, 6, 'Break Sofa', 'For thinking. Not sleeping.', false],

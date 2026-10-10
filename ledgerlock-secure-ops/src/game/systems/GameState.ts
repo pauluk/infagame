@@ -22,7 +22,7 @@ export type StateEvents = {
   result: ResultCard;
   dialog: DialogSpec;
   fx: { type: 'scan' | 'sparkle' | 'alarm' | 'barrier' | 'release' | 'pass' | 'repair'; target: string };
-  ui: 'map' | 'log' | 'fabric' | 'blueprint' | 'board';
+  ui: 'map' | 'log' | 'fabric' | 'blueprint' | 'board' | 'access';
   complete: GameState;
   pass: { pass: PassId; granted: boolean };
 };

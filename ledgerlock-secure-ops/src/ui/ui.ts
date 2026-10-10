@@ -21,6 +21,7 @@ import { COACH } from '../data/coach';
 import { TeamPanel } from './teamPanel';
 import { BlueprintView } from './blueprint';
 import { IncidentBoardView } from './incidentBoard';
+import { AccessReviewView } from './accessReview';
 import { IncidentBoard } from '../game/systems/Incidents';
 import { jev, type JevChoice } from '../integrations/jev/JevClient';
 import type { FabricSnapshot } from '../integrations/fabric';
@@ -42,6 +43,7 @@ export class UI {
   private teamPanel: TeamPanel | null = null;
   blueprint: BlueprintView | null = null;
   board: IncidentBoardView | null = null;
+  access: AccessReviewView | null = null;
   private panelOpen: string | null = null;
   private dirty = false;
   private mmTimer = 0;
@@ -233,6 +235,7 @@ export class UI {
     void this.refreshFabric();
     this.renderHud(); this.renderBelt(); this.renderInspect(); this.renderLog(); this.applySettings();
     state.speed = 1; scene.team.setCrew(settings.data.team);
+    this.access = new AccessReviewView(this.root, { toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
     this.board = new IncidentBoardView(this.root, { state, runner, scene, toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; }, openMap: () => this.blueprint?.open('incident'), openDialog: (d) => this.openDialog(d) });
     this.blueprint = new BlueprintView(this.root, { state, runner, scene, openBoard: () => this.board?.open(), toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
     this.teamPanel = new TeamPanel($(this.hud!, '#team')!, $(this.hud!, '#b-team')!, state, scene, { openDialog: (d) => this.openDialog(d), toast: (h, t) => this.toast(h, t) });
@@ -244,7 +247,7 @@ export class UI {
 
   detachMission(): void {
     this.unsub.forEach((u) => u()); this.unsub = [];
-    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.board?.close(); this.board = null; this.teamPanel = null; document.body.classList.remove('team-open');
+    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.board?.close(); this.board = null; this.access?.close(); this.access = null; this.teamPanel = null; document.body.classList.remove('team-open');
     this.hud?.remove(); this.hud = null; this.state = null; this.runner = null; this.scene = null; this.dialogOpen = false; this.pauseOpen = false;
     $(this.root, '#dialog')?.remove(); $(this.root, '#panelmodal')?.remove();
   }
@@ -281,6 +284,7 @@ export class UI {
     if (!this.state || this.dialogOpen) return;
     if (this.blueprint?.isOpen) { this.blueprint.close(); return; }
     if (this.board?.isOpen) { this.board.close(); return; }
+    if (this.access?.isOpen) { this.access.close(); return; }
     if (this.pauseOpen) { this.pauseOpen = false; this.clearScreen(); this.state.paused = false; return; }
     this.pauseOpen = true; this.state.paused = true;
     const s = this.showScreen(`<div class="card"><h2>Paused</h2><p>The incident clock is stopped.</p>
@@ -595,8 +599,9 @@ export class UI {
   }
 
   // ===================================================================== panels ====
-  openPanel(kind: 'map' | 'log' | 'fabric' | 'blueprint' | 'board'): void {
+  openPanel(kind: 'map' | 'log' | 'fabric' | 'blueprint' | 'board' | 'access'): void {
     if (!this.hud || !this.state) return;
+    if (kind === 'access') { if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen || this.board?.isOpen) return; this.access?.open(); return; }
     if (kind === 'board') { if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen) return; this.board?.toggle(); return; }
     if (kind === 'blueprint') { if (this.dialogOpen || this.pauseOpen) return; this.blueprint?.toggle(); return; }
     if (kind === 'log') { $(this.hud, '#logpanel')!.classList.toggle('hidden'); return; }

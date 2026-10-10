@@ -832,3 +832,15 @@ describe('access review: service form, review board, audit trail', () => {
     expect(s.summary().penalties.filter((p) => /never reviewed/.test(p.text))).toEqual([]); expect(s.summary().total).toBeGreaterThanOrEqual(95);
   });
 });
+
+describe('avatars: local generator with a built-in fallback', async () => {
+  const { avatarSvg, monogram } = await import('../src/ui/avatar');
+  it('is deterministic, varied, self-contained (no network) and never needs a real name', () => {
+    expect(avatarSvg('k3f9a1')).toBe(avatarSvg('k3f9a1'));
+    const set = new Set(ACCESS_REQUESTS.map((r) => avatarSvg(r.person.seed))); expect(set.size).toBe(ACCESS_REQUESTS.length);
+    for (const r of ACCESS_REQUESTS) { const svg = avatarSvg(r.person.seed, r.person.name); expect(svg).toMatch(/^<svg/); expect(svg).not.toMatch(/https?:\/\/(?!www\.w3\.org)/); expect(svg).not.toMatch(/<image|<script|href=/); }
+  });
+  it('falls back to a monogram badge when there is no seed', () => {
+    expect(avatarSvg('', 'Marisol Vance')).toBe(monogram('Marisol Vance')); expect(monogram('Marisol Vance')).toContain('>MV<'); expect(monogram('')).toContain('>?<');
+  });
+});
