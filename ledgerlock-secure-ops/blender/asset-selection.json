@@ -1,0 +1,388 @@
+{
+ "schema": 1,
+ "packs": {
+  "quaternius-modular-scifi-megakit": {
+   "name": "Modular SciFi MegaKit (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/modularscifimegakit.html",
+   "download_url": "https://quaternius.itch.io/modular-sci-fi-megakit",
+   "original_filename": "Modular SciFi MegaKit[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-modular-scifi-megakit/Modular SciFi MegaKit[Standard]/License_Standard.txt",
+   "dir": "quaternius-modular-scifi-megakit/Modular SciFi MegaKit[Standard]/glTF/",
+   "scale": 0.3
+  },
+  "quaternius-universal-base-characters": {
+   "name": "Universal Base Characters (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/universalbasecharacters.html",
+   "download_url": "https://quaternius.itch.io/universal-base-characters",
+   "original_filename": "Universal Base Characters[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-universal-base-characters/Universal Base Characters[Standard]/License_Standard.txt",
+   "dir": "quaternius-universal-base-characters/Universal Base Characters[Standard]/Base Characters/Godot - UE/",
+   "scale": 1.0
+  },
+  "quaternius-universal-animation-library": {
+   "name": "Universal Animation Library (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/universalanimationlibrary.html",
+   "download_url": "https://quaternius.itch.io/universal-animation-library",
+   "original_filename": "Universal Animation Library[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-universal-animation-library/Universal Animation Library[Standard]/License.txt",
+   "dir": "quaternius-universal-animation-library/Universal Animation Library[Standard]/Unreal-Godot/",
+   "scale": 1.0
+  },
+  "kenney-furniture-kit": {
+   "name": "Furniture Kit 2.0",
+   "creator": "Kenney",
+   "source_url": "https://kenney.nl/assets/furniture-kit",
+   "download_url": "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip",
+   "original_filename": "kenney_furniture-kit.zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/kenney-furniture-kit/License.txt",
+   "dir": "kenney-furniture-kit/Models/GLTF format/",
+   "scale": 1.0
+  },
+  "polyhaven": {
+   "name": "Poly Haven (anti_skid_tiles texture, blue_photo_studio HDRI)",
+   "creator": "Amal Kumar (anti_skid_tiles); Sergej Majboroda (blue_photo_studio)",
+   "source_url": "https://polyhaven.com/a/anti_skid_tiles",
+   "download_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/anti_skid_tiles/anti_skid_tiles_diff_1k.jpg",
+   "original_filename": "anti_skid_tiles_diff_1k.jpg; anti_skid_tiles_nor_gl_1k.jpg; blue_photo_studio_1k.hdr",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://polyhaven.com/license",
+   "license_file": "blender/source-assets/vendor/polyhaven/LICENSE.txt",
+   "dir": "polyhaven/",
+   "scale": 1.0
+  }
+ },
+ "items": [
+  {
+   "id": "mk_platform_simple",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Platform_Simple.gltf",
+   "role": "floor",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_platform_metal",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Platform_Metal.gltf",
+   "role": "floor",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_platform_darkplates",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Platform_DarkPlates.gltf",
+   "role": "floor",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_platform_squares",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Platform_Squares.gltf",
+   "role": "floor",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_platform_centerplate",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Platform_CenterPlate.gltf",
+   "role": "floor",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_door_frame_square",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Door_Frame_Square.gltf",
+   "role": "door",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_door_simple",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Door_Simple.gltf",
+   "role": "door",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_door_metal",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Platforms/Door_Metal.gltf",
+   "role": "door",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_wallband_straight",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/WallBand_Straight.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_wallwindow_straight",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/WallWindow_Straight.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_shortwall_whiteplate2",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/ShortWall_WhitePlate2_Straight.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_shortwall_band2",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/ShortWall_Band2_Straight.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_wallband_corner",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/WallBand_Corner_Square_Outer.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_topcables_straight",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Walls/TopCables_Straight.gltf",
+   "role": "wall",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_column_pipes",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Columns/Column_Pipes.gltf",
+   "role": "pillar",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_column_simple",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Columns/Column_Simple.gltf",
+   "role": "pillar",
+   "scale": 0.3
+  },
+  {
+   "id": "mk_prop_computer",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Computer.gltf",
+   "role": "equipment",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_light_wide",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Light_Wide.gltf",
+   "role": "light",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_cable_1",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Cable_1.gltf",
+   "role": "cable",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_cable_3",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Cable_3.gltf",
+   "role": "cable",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_vent_big",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Vent_Big.gltf",
+   "role": "equipment",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_accesspoint",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_AccessPoint.gltf",
+   "role": "equipment",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_itemholder",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_ItemHolder.gltf",
+   "role": "equipment",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_crate3",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Crate3.gltf",
+   "role": "storage",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_chest",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Chest.gltf",
+   "role": "storage",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_fan_small",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Fan_Small.gltf",
+   "role": "equipment",
+   "scale": 1.0
+  },
+  {
+   "id": "mk_prop_light_floor",
+   "pack": "quaternius-modular-scifi-megakit",
+   "file": "Props/Prop_Light_Floor.gltf",
+   "role": "light",
+   "scale": 1.0
+  },
+  {
+   "id": "kn_desk",
+   "pack": "kenney-furniture-kit",
+   "file": "desk.glb",
+   "role": "desk"
+  },
+  {
+   "id": "kn_deskCorner",
+   "pack": "kenney-furniture-kit",
+   "file": "deskCorner.glb",
+   "role": "desk"
+  },
+  {
+   "id": "kn_chairDesk",
+   "pack": "kenney-furniture-kit",
+   "file": "chairDesk.glb",
+   "role": "chair"
+  },
+  {
+   "id": "kn_computerScreen",
+   "pack": "kenney-furniture-kit",
+   "file": "computerScreen.glb",
+   "role": "computer"
+  },
+  {
+   "id": "kn_computerKeyboard",
+   "pack": "kenney-furniture-kit",
+   "file": "computerKeyboard.glb",
+   "role": "computer"
+  },
+  {
+   "id": "kn_laptop",
+   "pack": "kenney-furniture-kit",
+   "file": "laptop.glb",
+   "role": "computer"
+  },
+  {
+   "id": "kn_bookcaseClosedDoors",
+   "pack": "kenney-furniture-kit",
+   "file": "bookcaseClosedDoors.glb",
+   "role": "storage"
+  },
+  {
+   "id": "kn_bookcaseClosed",
+   "pack": "kenney-furniture-kit",
+   "file": "bookcaseClosed.glb",
+   "role": "storage"
+  },
+  {
+   "id": "kn_pottedPlant",
+   "pack": "kenney-furniture-kit",
+   "file": "pottedPlant.glb",
+   "role": "decor"
+  },
+  {
+   "id": "kn_plantSmall1",
+   "pack": "kenney-furniture-kit",
+   "file": "plantSmall1.glb",
+   "role": "decor"
+  },
+  {
+   "id": "kn_kitchenCoffeeMachine",
+   "pack": "kenney-furniture-kit",
+   "file": "kitchenCoffeeMachine.glb",
+   "role": "kitchen"
+  },
+  {
+   "id": "kn_sideTableDrawers",
+   "pack": "kenney-furniture-kit",
+   "file": "sideTableDrawers.glb",
+   "role": "furniture"
+  },
+  {
+   "id": "kn_tableCoffeeSquare",
+   "pack": "kenney-furniture-kit",
+   "file": "tableCoffeeSquare.glb",
+   "role": "furniture"
+  },
+  {
+   "id": "kn_loungeSofa",
+   "pack": "kenney-furniture-kit",
+   "file": "loungeSofa.glb",
+   "role": "furniture"
+  },
+  {
+   "id": "kn_lampRoundFloor",
+   "pack": "kenney-furniture-kit",
+   "file": "lampRoundFloor.glb",
+   "role": "light"
+  },
+  {
+   "id": "kn_coatRack",
+   "pack": "kenney-furniture-kit",
+   "file": "coatRack.glb",
+   "role": "furniture"
+  },
+  {
+   "id": "kn_cardboardBoxClosed",
+   "pack": "kenney-furniture-kit",
+   "file": "cardboardBoxClosed.glb",
+   "role": "storage"
+  },
+  {
+   "id": "kn_rugRectangle",
+   "pack": "kenney-furniture-kit",
+   "file": "rugRectangle.glb",
+   "role": "decor"
+  },
+  {
+   "id": "char_engineer",
+   "pack": "quaternius-universal-base-characters",
+   "file": "Superhero_Male_FullBody.gltf",
+   "role": "character"
+  },
+  {
+   "id": "anim_ual1",
+   "pack": "quaternius-universal-animation-library",
+   "file": "UAL1_Standard.glb",
+   "role": "animations"
+  },
+  {
+   "id": "ph_floor_tiles",
+   "pack": "polyhaven",
+   "file": "anti_skid_tiles_diff_1k.jpg",
+   "role": "material"
+  },
+  {
+   "id": "ph_hdri",
+   "pack": "polyhaven",
+   "file": "blue_photo_studio_1k.hdr",
+   "role": "lighting (render-time only, not shipped)"
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+Poly Haven assets are released under CC0 1.0 Universal (public domain dedication).
+Verified 2026-10-10 at https://polyhaven.com/license and on the asset pages:
+  - https://polyhaven.com/a/anti_skid_tiles  (author: Amal Kumar)
+  - https://polyhaven.com/a/blue_photo_studio (author: Sergej Majboroda)
+https://creativecommons.org/publicdomain/zero/1.0/

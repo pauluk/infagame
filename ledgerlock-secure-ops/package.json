@@ -1,0 +1,28 @@
+{
+  "name": "ledgerlock-secure-ops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LedgerLock: Secure Ops - an isometric finance-operations incident game built with Phaser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node tests/e2e.mjs",
+    "assets:render": "node scripts/render-assets.mjs",
+    "fabric-proxy": "node server/fabricProxy.mjs"
+  },
+  "dependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

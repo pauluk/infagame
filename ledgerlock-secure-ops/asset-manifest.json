@@ -1,0 +1,2921 @@
+{
+ "project": "LedgerLock: Secure Ops",
+ "generated": "2026-10-10T21:11:50+00:00",
+ "renderer": "Blender 4.5.9 LTS, Cycles CPU (see docs/art-pipeline.md)",
+ "note": "Only third-party items that were actually imported and rendered into at least one sprite are listed. Custom props, bugs, malware and effects were modelled for this project in Blender (no third-party source).",
+ "sources": [
+  {
+   "id": "quaternius-modular-scifi-megakit",
+   "name": "Modular SciFi MegaKit (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/modularscifimegakit.html",
+   "download_url": "https://quaternius.itch.io/modular-sci-fi-megakit",
+   "original_filename": "Modular SciFi MegaKit[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-modular-scifi-megakit/Modular SciFi MegaKit[Standard]/License_Standard.txt",
+   "license_verified": "2026-10-10, on the pack page and in the supplied licence file",
+   "attribution_required": false,
+   "items": [
+    {
+     "id": "mk_platform_metal",
+     "file": "Platforms/Platform_Metal.gltf",
+     "role": "floor",
+     "rendered_into": [
+      "floor_b"
+     ]
+    },
+    {
+     "id": "mk_platform_darkplates",
+     "file": "Platforms/Platform_DarkPlates.gltf",
+     "role": "floor",
+     "rendered_into": [
+      "floor_dark"
+     ]
+    },
+    {
+     "id": "mk_platform_squares",
+     "file": "Platforms/Platform_Squares.gltf",
+     "role": "floor",
+     "rendered_into": [
+      "floor_a"
+     ]
+    },
+    {
+     "id": "mk_platform_centerplate",
+     "file": "Platforms/Platform_CenterPlate.gltf",
+     "role": "floor",
+     "rendered_into": [
+      "floor_door"
+     ]
+    },
+    {
+     "id": "mk_door_frame_square",
+     "file": "Platforms/Door_Frame_Square.gltf",
+     "role": "door",
+     "rendered_into": [
+      "door_n_closed",
+      "door_n_open",
+      "door_w_closed",
+      "door_w_open"
+     ]
+    },
+    {
+     "id": "mk_door_simple",
+     "file": "Platforms/Door_Simple.gltf",
+     "role": "door",
+     "rendered_into": [
+      "door_n_closed",
+      "door_n_open",
+      "door_w_closed",
+      "door_w_open"
+     ]
+    },
+    {
+     "id": "mk_wallband_straight",
+     "file": "Walls/WallBand_Straight.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "wall_n_band",
+      "wall_w_band"
+     ]
+    },
+    {
+     "id": "mk_wallwindow_straight",
+     "file": "Walls/WallWindow_Straight.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "wall_n_window",
+      "wall_w_window"
+     ]
+    },
+    {
+     "id": "mk_shortwall_whiteplate2",
+     "file": "Walls/ShortWall_WhitePlate2_Straight.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "wall_n_plate",
+      "wall_w_plate"
+     ]
+    },
+    {
+     "id": "mk_shortwall_band2",
+     "file": "Walls/ShortWall_Band2_Straight.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "wall_e_low",
+      "wall_s_low"
+     ]
+    },
+    {
+     "id": "mk_wallband_corner",
+     "file": "Walls/WallBand_Corner_Square_Outer.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "wall_corner_nw"
+     ]
+    },
+    {
+     "id": "mk_topcables_straight",
+     "file": "Walls/TopCables_Straight.gltf",
+     "role": "wall",
+     "rendered_into": [
+      "cable_run"
+     ]
+    },
+    {
+     "id": "mk_column_pipes",
+     "file": "Columns/Column_Pipes.gltf",
+     "role": "pillar",
+     "rendered_into": [
+      "d_pipes_col",
+      "pillar_pipes"
+     ]
+    },
+    {
+     "id": "mk_column_simple",
+     "file": "Columns/Column_Simple.gltf",
+     "role": "pillar",
+     "rendered_into": [
+      "pillar"
+     ]
+    },
+    {
+     "id": "mk_prop_computer",
+     "file": "Props/Prop_Computer.gltf",
+     "role": "equipment",
+     "rendered_into": [
+      "i_terminal_blue",
+      "i_terminal_cyan",
+      "i_terminal_mint",
+      "i_terminal_violet"
+     ]
+    },
+    {
+     "id": "mk_prop_light_wide",
+     "file": "Props/Prop_Light_Wide.gltf",
+     "role": "light",
+     "rendered_into": [
+      "i_rack_amber",
+      "i_rack_blue",
+      "i_rack_cyan",
+      "i_rack_mint",
+      "i_rack_periwinkle",
+      "i_rack_violet"
+     ]
+    },
+    {
+     "id": "mk_prop_cable_3",
+     "file": "Props/Prop_Cable_3.gltf",
+     "role": "cable",
+     "rendered_into": [
+      "d_cable_tray"
+     ]
+    },
+    {
+     "id": "mk_prop_vent_big",
+     "file": "Props/Prop_Vent_Big.gltf",
+     "role": "equipment",
+     "rendered_into": [
+      "d_vent"
+     ]
+    },
+    {
+     "id": "mk_prop_accesspoint",
+     "file": "Props/Prop_AccessPoint.gltf",
+     "role": "equipment",
+     "rendered_into": [
+      "i_console_ops"
+     ]
+    },
+    {
+     "id": "mk_prop_itemholder",
+     "file": "Props/Prop_ItemHolder.gltf",
+     "role": "equipment",
+     "rendered_into": [
+      "d_itemholder"
+     ]
+    },
+    {
+     "id": "mk_prop_crate3",
+     "file": "Props/Prop_Crate3.gltf",
+     "role": "storage",
+     "rendered_into": [
+      "d_box",
+      "d_crate"
+     ]
+    },
+    {
+     "id": "mk_prop_chest",
+     "file": "Props/Prop_Chest.gltf",
+     "role": "storage",
+     "rendered_into": [
+      "d_chest"
+     ]
+    },
+    {
+     "id": "mk_prop_fan_small",
+     "file": "Props/Prop_Fan_Small.gltf",
+     "role": "equipment",
+     "rendered_into": [
+      "d_fan"
+     ]
+    },
+    {
+     "id": "mk_prop_light_floor",
+     "file": "Props/Prop_Light_Floor.gltf",
+     "role": "light",
+     "rendered_into": [
+      "d_floorlight"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "quaternius-universal-base-characters",
+   "name": "Universal Base Characters (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/universalbasecharacters.html",
+   "download_url": "https://quaternius.itch.io/universal-base-characters",
+   "original_filename": "Universal Base Characters[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-universal-base-characters/Universal Base Characters[Standard]/License_Standard.txt",
+   "license_verified": "2026-10-10, on the pack page and in the supplied licence file",
+   "attribution_required": false,
+   "items": [
+    {
+     "id": "char_engineer",
+     "file": "Superhero_Male_FullBody.gltf",
+     "role": "character",
+     "rendered_into": [
+      "eng_ne_idle_0",
+      "eng_ne_idle_1",
+      "eng_ne_repair_0",
+      "eng_ne_repair_1",
+      "eng_ne_repair_2",
+      "eng_ne_repair_3",
+      "eng_ne_scan_0",
+      "eng_ne_scan_1",
+      "eng_ne_scan_2",
+      "eng_ne_scan_3",
+      "eng_ne_success_0",
+      "eng_ne_success_1",
+      "eng_ne_success_2",
+      "eng_ne_success_3",
+      "eng_ne_walk_0",
+      "eng_ne_walk_1",
+      "eng_ne_walk_2",
+      "eng_ne_walk_3",
+      "eng_ne_walk_4",
+      "eng_ne_walk_5",
+      "eng_ne_walk_6",
+      "eng_ne_walk_7",
+      "eng_nw_idle_0",
+      "eng_nw_idle_1",
+      "eng_nw_repair_0",
+      "eng_nw_repair_1",
+      "eng_nw_repair_2",
+      "eng_nw_repair_3",
+      "eng_nw_scan_0",
+      "eng_nw_scan_1",
+      "eng_nw_scan_2",
+      "eng_nw_scan_3",
+      "eng_nw_success_0",
+      "eng_nw_success_1",
+      "eng_nw_success_2",
+      "eng_nw_success_3",
+      "eng_nw_walk_0",
+      "eng_nw_walk_1",
+      "eng_nw_walk_2",
+      "eng_nw_walk_3",
+      "eng_nw_walk_4",
+      "eng_nw_walk_5",
+      "eng_nw_walk_6",
+      "eng_nw_walk_7",
+      "eng_se_idle_0",
+      "eng_se_idle_1",
+      "eng_se_repair_0",
+      "eng_se_repair_1",
+      "eng_se_repair_2",
+      "eng_se_repair_3",
+      "eng_se_scan_0",
+      "eng_se_scan_1",
+      "eng_se_scan_2",
+      "eng_se_scan_3",
+      "eng_se_success_0",
+      "eng_se_success_1",
+      "eng_se_success_2",
+      "eng_se_success_3",
+      "eng_se_walk_0",
+      "eng_se_walk_1",
+      "eng_se_walk_2",
+      "eng_se_walk_3",
+      "eng_se_walk_4",
+      "eng_se_walk_5",
+      "eng_se_walk_6",
+      "eng_se_walk_7",
+      "eng_sw_idle_0",
+      "eng_sw_idle_1",
+      "eng_sw_repair_0",
+      "eng_sw_repair_1",
+      "eng_sw_repair_2",
+      "eng_sw_repair_3",
+      "eng_sw_scan_0",
+      "eng_sw_scan_1",
+      "eng_sw_scan_2",
+      "eng_sw_scan_3",
+      "eng_sw_success_0",
+      "eng_sw_success_1",
+      "eng_sw_success_2",
+      "eng_sw_success_3",
+      "eng_sw_walk_0",
+      "eng_sw_walk_1",
+      "eng_sw_walk_2",
+      "eng_sw_walk_3",
+      "eng_sw_walk_4",
+      "eng_sw_walk_5",
+      "eng_sw_walk_6",
+      "eng_sw_walk_7"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "quaternius-universal-animation-library",
+   "name": "Universal Animation Library (Standard, free)",
+   "creator": "Quaternius",
+   "source_url": "https://quaternius.com/packs/universalanimationlibrary.html",
+   "download_url": "https://quaternius.itch.io/universal-animation-library",
+   "original_filename": "Universal Animation Library[Standard].zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/quaternius-universal-animation-library/Universal Animation Library[Standard]/License.txt",
+   "license_verified": "2026-10-10, on the pack page and in the supplied licence file",
+   "attribution_required": false,
+   "items": [
+    {
+     "id": "anim_ual1",
+     "file": "UAL1_Standard.glb",
+     "role": "animations",
+     "rendered_into": [
+      "eng_ne_idle_0",
+      "eng_ne_idle_1",
+      "eng_ne_repair_0",
+      "eng_ne_repair_1",
+      "eng_ne_repair_2",
+      "eng_ne_repair_3",
+      "eng_ne_scan_0",
+      "eng_ne_scan_1",
+      "eng_ne_scan_2",
+      "eng_ne_scan_3",
+      "eng_ne_success_0",
+      "eng_ne_success_1",
+      "eng_ne_success_2",
+      "eng_ne_success_3",
+      "eng_ne_walk_0",
+      "eng_ne_walk_1",
+      "eng_ne_walk_2",
+      "eng_ne_walk_3",
+      "eng_ne_walk_4",
+      "eng_ne_walk_5",
+      "eng_ne_walk_6",
+      "eng_ne_walk_7",
+      "eng_nw_idle_0",
+      "eng_nw_idle_1",
+      "eng_nw_repair_0",
+      "eng_nw_repair_1",
+      "eng_nw_repair_2",
+      "eng_nw_repair_3",
+      "eng_nw_scan_0",
+      "eng_nw_scan_1",
+      "eng_nw_scan_2",
+      "eng_nw_scan_3",
+      "eng_nw_success_0",
+      "eng_nw_success_1",
+      "eng_nw_success_2",
+      "eng_nw_success_3",
+      "eng_nw_walk_0",
+      "eng_nw_walk_1",
+      "eng_nw_walk_2",
+      "eng_nw_walk_3",
+      "eng_nw_walk_4",
+      "eng_nw_walk_5",
+      "eng_nw_walk_6",
+      "eng_nw_walk_7",
+      "eng_se_idle_0",
+      "eng_se_idle_1",
+      "eng_se_repair_0",
+      "eng_se_repair_1",
+      "eng_se_repair_2",
+      "eng_se_repair_3",
+      "eng_se_scan_0",
+      "eng_se_scan_1",
+      "eng_se_scan_2",
+      "eng_se_scan_3",
+      "eng_se_success_0",
+      "eng_se_success_1",
+      "eng_se_success_2",
+      "eng_se_success_3",
+      "eng_se_walk_0",
+      "eng_se_walk_1",
+      "eng_se_walk_2",
+      "eng_se_walk_3",
+      "eng_se_walk_4",
+      "eng_se_walk_5",
+      "eng_se_walk_6",
+      "eng_se_walk_7",
+      "eng_sw_idle_0",
+      "eng_sw_idle_1",
+      "eng_sw_repair_0",
+      "eng_sw_repair_1",
+      "eng_sw_repair_2",
+      "eng_sw_repair_3",
+      "eng_sw_scan_0",
+      "eng_sw_scan_1",
+      "eng_sw_scan_2",
+      "eng_sw_scan_3",
+      "eng_sw_success_0",
+      "eng_sw_success_1",
+      "eng_sw_success_2",
+      "eng_sw_success_3",
+      "eng_sw_walk_0",
+      "eng_sw_walk_1",
+      "eng_sw_walk_2",
+      "eng_sw_walk_3",
+      "eng_sw_walk_4",
+      "eng_sw_walk_5",
+      "eng_sw_walk_6",
+      "eng_sw_walk_7"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "kenney-furniture-kit",
+   "name": "Furniture Kit 2.0",
+   "creator": "Kenney",
+   "source_url": "https://kenney.nl/assets/furniture-kit",
+   "download_url": "https://kenney.nl/media/pages/assets/furniture-kit/440e0608a4-1677580847/kenney_furniture-kit.zip",
+   "original_filename": "kenney_furniture-kit.zip",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "license_file": "blender/source-assets/vendor/kenney-furniture-kit/License.txt",
+   "license_verified": "2026-10-10, on the pack page and in the supplied licence file",
+   "attribution_required": false,
+   "items": [
+    {
+     "id": "kn_desk",
+     "file": "desk.glb",
+     "role": "desk",
+     "rendered_into": [
+      "d_desk_set"
+     ]
+    },
+    {
+     "id": "kn_deskCorner",
+     "file": "deskCorner.glb",
+     "role": "desk",
+     "rendered_into": [
+      "d_desk_laptop"
+     ]
+    },
+    {
+     "id": "kn_chairDesk",
+     "file": "chairDesk.glb",
+     "role": "chair",
+     "rendered_into": [
+      "d_chair",
+      "d_desk_set"
+     ]
+    },
+    {
+     "id": "kn_computerScreen",
+     "file": "computerScreen.glb",
+     "role": "computer",
+     "rendered_into": [
+      "d_desk_set"
+     ]
+    },
+    {
+     "id": "kn_computerKeyboard",
+     "file": "computerKeyboard.glb",
+     "role": "computer",
+     "rendered_into": [
+      "d_desk_set"
+     ]
+    },
+    {
+     "id": "kn_laptop",
+     "file": "laptop.glb",
+     "role": "computer",
+     "rendered_into": [
+      "d_desk_laptop"
+     ]
+    },
+    {
+     "id": "kn_bookcaseClosedDoors",
+     "file": "bookcaseClosedDoors.glb",
+     "role": "storage",
+     "rendered_into": [
+      "d_bookcase"
+     ]
+    },
+    {
+     "id": "kn_bookcaseClosed",
+     "file": "bookcaseClosed.glb",
+     "role": "storage",
+     "rendered_into": [
+      "d_bookcase2"
+     ]
+    },
+    {
+     "id": "kn_pottedPlant",
+     "file": "pottedPlant.glb",
+     "role": "decor",
+     "rendered_into": [
+      "d_plant"
+     ]
+    },
+    {
+     "id": "kn_plantSmall1",
+     "file": "plantSmall1.glb",
+     "role": "decor",
+     "rendered_into": [
+      "d_plant_small"
+     ]
+    },
+    {
+     "id": "kn_kitchenCoffeeMachine",
+     "file": "kitchenCoffeeMachine.glb",
+     "role": "kitchen",
+     "rendered_into": [
+      "i_coffee"
+     ]
+    },
+    {
+     "id": "kn_sideTableDrawers",
+     "file": "sideTableDrawers.glb",
+     "role": "furniture",
+     "rendered_into": [
+      "i_coffee"
+     ]
+    },
+    {
+     "id": "kn_tableCoffeeSquare",
+     "file": "tableCoffeeSquare.glb",
+     "role": "furniture",
+     "rendered_into": [
+      "d_table"
+     ]
+    },
+    {
+     "id": "kn_loungeSofa",
+     "file": "loungeSofa.glb",
+     "role": "furniture",
+     "rendered_into": [
+      "d_sofa"
+     ]
+    },
+    {
+     "id": "kn_lampRoundFloor",
+     "file": "lampRoundFloor.glb",
+     "role": "light",
+     "rendered_into": [
+      "d_lamp"
+     ]
+    },
+    {
+     "id": "kn_coatRack",
+     "file": "coatRack.glb",
+     "role": "furniture",
+     "rendered_into": [
+      "d_coatrack"
+     ]
+    },
+    {
+     "id": "kn_cardboardBoxClosed",
+     "file": "cardboardBoxClosed.glb",
+     "role": "storage",
+     "rendered_into": [
+      "d_box"
+     ]
+    },
+    {
+     "id": "kn_rugRectangle",
+     "file": "rugRectangle.glb",
+     "role": "decor",
+     "rendered_into": [
+      "d_rug"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "polyhaven",
+   "name": "Poly Haven (anti_skid_tiles texture, blue_photo_studio HDRI)",
+   "creator": "Amal Kumar (anti_skid_tiles); Sergej Majboroda (blue_photo_studio)",
+   "source_url": "https://polyhaven.com/a/anti_skid_tiles",
+   "download_url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/anti_skid_tiles/anti_skid_tiles_diff_1k.jpg",
+   "original_filename": "anti_skid_tiles_diff_1k.jpg; anti_skid_tiles_nor_gl_1k.jpg; blue_photo_studio_1k.hdr",
+   "license": "CC0 1.0 Universal",
+   "license_url": "https://polyhaven.com/license",
+   "license_file": "blender/source-assets/vendor/polyhaven/LICENSE.txt",
+   "license_verified": "2026-10-10, on the pack page and in the supplied licence file",
+   "attribution_required": false,
+   "items": [
+    {
+     "id": "ph_floor_tiles",
+     "file": "anti_skid_tiles_diff_1k.jpg",
+     "role": "material",
+     "rendered_into": [
+      "floor_corridor"
+     ]
+    },
+    {
+     "id": "ph_hdri",
+     "file": "blue_photo_studio_1k.hdr",
+     "role": "lighting (render-time only, not shipped)",
+     "rendered_into": [
+      "bug_fixed",
+      "bug_gremlin",
+      "cable_run",
+      "corrupt_file",
+      "d_bookcase",
+      "d_bookcase2",
+      "d_box",
+      "d_cable_tray",
+      "d_chair",
+      "d_chest",
+      "d_coatrack",
+      "d_crate",
+      "d_desk_laptop",
+      "d_desk_set",
+      "d_fan",
+      "d_floorlight",
+      "d_itemholder",
+      "d_lamp",
+      "d_pipes_col",
+      "d_plant",
+      "d_plant_small",
+      "d_rug",
+      "d_sofa",
+      "d_table",
+      "d_vent",
+      "door_n_closed",
+      "door_n_open",
+      "door_w_closed",
+      "door_w_open",
+      "eng_ne_idle_0",
+      "eng_ne_idle_1",
+      "eng_ne_repair_0",
+      "eng_ne_repair_1",
+      "eng_ne_repair_2",
+      "eng_ne_repair_3",
+      "eng_ne_scan_0",
+      "eng_ne_scan_1",
+      "eng_ne_scan_2",
+      "eng_ne_scan_3",
+      "eng_ne_success_0",
+      "eng_ne_success_1",
+      "eng_ne_success_2",
+      "eng_ne_success_3",
+      "eng_ne_walk_0",
+      "eng_ne_walk_1",
+      "eng_ne_walk_2",
+      "eng_ne_walk_3",
+      "eng_ne_walk_4",
+      "eng_ne_walk_5",
+      "eng_ne_walk_6",
+      "eng_ne_walk_7",
+      "eng_nw_idle_0",
+      "eng_nw_idle_1",
+      "eng_nw_repair_0",
+      "eng_nw_repair_1",
+      "eng_nw_repair_2",
+      "eng_nw_repair_3",
+      "eng_nw_scan_0",
+      "eng_nw_scan_1",
+      "eng_nw_scan_2",
+      "eng_nw_scan_3",
+      "eng_nw_success_0",
+      "eng_nw_success_1",
+      "eng_nw_success_2",
+      "eng_nw_success_3",
+      "eng_nw_walk_0",
+      "eng_nw_walk_1",
+      "eng_nw_walk_2",
+      "eng_nw_walk_3",
+      "eng_nw_walk_4",
+      "eng_nw_walk_5",
+      "eng_nw_walk_6",
+      "eng_nw_walk_7",
+      "eng_se_idle_0",
+      "eng_se_idle_1",
+      "eng_se_repair_0",
+      "eng_se_repair_1",
+      "eng_se_repair_2",
+      "eng_se_repair_3",
+      "eng_se_scan_0",
+      "eng_se_scan_1",
+      "eng_se_scan_2",
+      "eng_se_scan_3",
+      "eng_se_success_0",
+      "eng_se_success_1",
+      "eng_se_success_2",
+      "eng_se_success_3",
+      "eng_se_walk_0",
+      "eng_se_walk_1",
+      "eng_se_walk_2",
+      "eng_se_walk_3",
+      "eng_se_walk_4",
+      "eng_se_walk_5",
+      "eng_se_walk_6",
+      "eng_se_walk_7",
+      "eng_sw_idle_0",
+      "eng_sw_idle_1",
+      "eng_sw_repair_0",
+      "eng_sw_repair_1",
+      "eng_sw_repair_2",
+      "eng_sw_repair_3",
+      "eng_sw_scan_0",
+      "eng_sw_scan_1",
+      "eng_sw_scan_2",
+      "eng_sw_scan_3",
+      "eng_sw_success_0",
+      "eng_sw_success_1",
+      "eng_sw_success_2",
+      "eng_sw_success_3",
+      "eng_sw_walk_0",
+      "eng_sw_walk_1",
+      "eng_sw_walk_2",
+      "eng_sw_walk_3",
+      "eng_sw_walk_4",
+      "eng_sw_walk_5",
+      "eng_sw_walk_6",
+      "eng_sw_walk_7",
+      "entrance_gate",
+      "ext_dock_blue",
+      "ext_dock_cyan",
+      "ext_dock_mint",
+      "ext_dock_violet",
+      "floor_a",
+      "floor_b",
+      "floor_corridor",
+      "floor_dark",
+      "floor_door",
+      "fx_light_amber",
+      "fx_light_coral",
+      "fx_light_cyan",
+      "fx_light_mint",
+      "fx_quarantine_amber",
+      "fx_quarantine_coral",
+      "fx_repair",
+      "fx_scan_ring",
+      "fx_success",
+      "gate_e_closed",
+      "gate_e_open",
+      "gate_s_closed",
+      "gate_s_open",
+      "ghost_receipt",
+      "i_cabinet_secure",
+      "i_case_bacs",
+      "i_coffee",
+      "i_console_api",
+      "i_console_debt",
+      "i_console_event",
+      "i_console_integ",
+      "i_console_ledger",
+      "i_console_ops",
+      "i_console_payment",
+      "i_node_bronze",
+      "i_node_gold",
+      "i_node_silver",
+      "i_rack_amber",
+      "i_rack_blue",
+      "i_rack_cyan",
+      "i_rack_mint",
+      "i_rack_periwinkle",
+      "i_rack_violet",
+      "i_screen_alert",
+      "i_screen_dashboard",
+      "i_table_map",
+      "i_terminal_blue",
+      "i_terminal_card",
+      "i_terminal_cyan",
+      "i_terminal_mint",
+      "i_terminal_violet",
+      "malware_spike",
+      "pillar",
+      "pillar_pipes",
+      "reader",
+      "reader_ok",
+      "tool_lens",
+      "tool_patch",
+      "tool_quarantine",
+      "tool_recon",
+      "tool_reroute",
+      "tool_restore",
+      "tool_scanner",
+      "tool_token",
+      "wall_corner_nw",
+      "wall_e_low",
+      "wall_n_band",
+      "wall_n_plate",
+      "wall_n_window",
+      "wall_s_low",
+      "wall_w_band",
+      "wall_w_plate",
+      "wall_w_window",
+      "wisp"
+     ]
+    }
+   ]
+  }
+ ],
+ "sprites": {
+  "floor_a": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "floor_a",
+   "library_items": [
+    "mk_platform_squares",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_platform_squares"
+   ]
+  },
+  "floor_b": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "floor_b",
+   "library_items": [
+    "mk_platform_metal",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_platform_metal"
+   ]
+  },
+  "floor_dark": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "floor_dark",
+   "library_items": [
+    "mk_platform_darkplates",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_platform_darkplates"
+   ]
+  },
+  "floor_door": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "floor_door",
+   "library_items": [
+    "mk_platform_centerplate",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_platform_centerplate"
+   ]
+  },
+  "floor_corridor": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "floor_corridor",
+   "library_items": [
+    "slab",
+    "tile_corridor"
+   ],
+   "third_party_items": [
+    "ph_floor_tiles"
+   ]
+  },
+  "wall_n_band": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_n_band",
+   "library_items": [
+    "mk_wallband_straight",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_wallband_straight"
+   ]
+  },
+  "wall_w_band": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_w_band",
+   "library_items": [
+    "mk_wallband_straight",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_wallband_straight"
+   ]
+  },
+  "wall_n_window": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_n_window",
+   "library_items": [
+    "mk_wallwindow_straight",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_wallwindow_straight"
+   ]
+  },
+  "wall_w_window": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_w_window",
+   "library_items": [
+    "mk_wallwindow_straight",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_wallwindow_straight"
+   ]
+  },
+  "wall_n_plate": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_n_plate",
+   "library_items": [
+    "mk_shortwall_whiteplate2",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_shortwall_whiteplate2"
+   ]
+  },
+  "wall_w_plate": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_w_plate",
+   "library_items": [
+    "mk_shortwall_whiteplate2",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_shortwall_whiteplate2"
+   ]
+  },
+  "wall_s_low": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_s_low",
+   "library_items": [
+    "mk_shortwall_band2",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_shortwall_band2"
+   ]
+  },
+  "wall_e_low": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_e_low",
+   "library_items": [
+    "mk_shortwall_band2",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_shortwall_band2"
+   ]
+  },
+  "wall_corner_nw": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "wall_corner_nw",
+   "library_items": [
+    "mk_wallband_corner",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_wallband_corner"
+   ]
+  },
+  "pillar": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "pillar",
+   "library_items": [
+    "mk_column_simple",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_column_simple"
+   ]
+  },
+  "pillar_pipes": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "pillar_pipes",
+   "library_items": [
+    "mk_column_pipes",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_column_pipes"
+   ]
+  },
+  "cable_run": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "cable_run",
+   "library_items": [
+    "mk_topcables_straight",
+    "slab",
+    "tile_floor_dark"
+   ],
+   "third_party_items": [
+    "mk_topcables_straight"
+   ]
+  },
+  "door_n_closed": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "door_n_closed",
+   "library_items": [
+    "door_lamp_closed",
+    "mk_door_frame_square",
+    "mk_door_simple",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_door_frame_square",
+    "mk_door_simple"
+   ]
+  },
+  "door_w_closed": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "door_w_closed",
+   "library_items": [
+    "door_lamp_closed",
+    "mk_door_frame_square",
+    "mk_door_simple",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_door_frame_square",
+    "mk_door_simple"
+   ]
+  },
+  "door_n_open": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "door_n_open",
+   "library_items": [
+    "door_lamp_open",
+    "mk_door_frame_square",
+    "mk_door_simple",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_door_frame_square",
+    "mk_door_simple"
+   ]
+  },
+  "door_w_open": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "door_w_open",
+   "library_items": [
+    "door_lamp_open",
+    "mk_door_frame_square",
+    "mk_door_simple",
+    "slab"
+   ],
+   "third_party_items": [
+    "mk_door_frame_square",
+    "mk_door_simple"
+   ]
+  },
+  "gate_s_closed": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "gate_s_closed",
+   "library_items": [
+    "gate_closed",
+    "slab"
+   ],
+   "third_party_items": []
+  },
+  "gate_e_closed": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "gate_e_closed",
+   "library_items": [
+    "gate_closed",
+    "slab"
+   ],
+   "third_party_items": []
+  },
+  "gate_s_open": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "gate_s_open",
+   "library_items": [
+    "gate_open",
+    "slab"
+   ],
+   "third_party_items": []
+  },
+  "gate_e_open": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "gate_e_open",
+   "library_items": [
+    "gate_open",
+    "slab"
+   ],
+   "third_party_items": []
+  },
+  "reader": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "reader",
+   "library_items": [
+    "reader"
+   ],
+   "third_party_items": []
+  },
+  "reader_ok": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "reader_ok",
+   "library_items": [
+    "reader_ok"
+   ],
+   "third_party_items": []
+  },
+  "ext_dock_cyan": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "ext_dock_cyan",
+   "library_items": [
+    "dock_cyan"
+   ],
+   "third_party_items": []
+  },
+  "ext_dock_blue": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "ext_dock_blue",
+   "library_items": [
+    "dock_blue"
+   ],
+   "third_party_items": []
+  },
+  "ext_dock_violet": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "ext_dock_violet",
+   "library_items": [
+    "dock_violet"
+   ],
+   "third_party_items": []
+  },
+  "ext_dock_mint": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "ext_dock_mint",
+   "library_items": [
+    "dock_mint"
+   ],
+   "third_party_items": []
+  },
+  "entrance_gate": {
+   "atlas": "assets/environment/atlas.json",
+   "frame": "entrance_gate",
+   "library_items": [
+    "entrance_gate"
+   ],
+   "third_party_items": []
+  },
+  "i_rack_cyan": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_cyan",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_cyan",
+    "rack_cyan"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_rack_blue": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_blue",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_blue",
+    "rack_blue"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_rack_mint": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_mint",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_mint",
+    "rack_mint"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_rack_violet": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_violet",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_violet",
+    "rack_violet"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_rack_periwinkle": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_periwinkle",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_periwinkle",
+    "rack_periwinkle"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_rack_amber": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_rack_amber",
+   "library_items": [
+    "mk_prop_light_wide",
+    "pad_amber",
+    "rack_amber"
+   ],
+   "third_party_items": [
+    "mk_prop_light_wide"
+   ]
+  },
+  "i_console_ledger": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_ledger",
+   "library_items": [
+    "console_ledger",
+    "pad_mint"
+   ],
+   "third_party_items": []
+  },
+  "i_console_payment": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_payment",
+   "library_items": [
+    "console_payment",
+    "pad_blue"
+   ],
+   "third_party_items": []
+  },
+  "i_console_api": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_api",
+   "library_items": [
+    "console_api",
+    "pad_cyan"
+   ],
+   "third_party_items": []
+  },
+  "i_console_ops": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_ops",
+   "library_items": [
+    "console_ops",
+    "mk_prop_accesspoint",
+    "pad_amber"
+   ],
+   "third_party_items": [
+    "mk_prop_accesspoint"
+   ]
+  },
+  "i_console_debt": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_debt",
+   "library_items": [
+    "console_debt",
+    "pad_violet"
+   ],
+   "third_party_items": []
+  },
+  "i_console_event": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_event",
+   "library_items": [
+    "console_event",
+    "pad_cyan"
+   ],
+   "third_party_items": []
+  },
+  "i_console_integ": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_console_integ",
+   "library_items": [
+    "console_integ",
+    "pad_cyan"
+   ],
+   "third_party_items": []
+  },
+  "i_terminal_card": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_terminal_card",
+   "library_items": [
+    "pad_mint",
+    "terminal_card"
+   ],
+   "third_party_items": []
+  },
+  "i_terminal_cyan": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_terminal_cyan",
+   "library_items": [
+    "mk_prop_computer",
+    "pad_cyan"
+   ],
+   "third_party_items": [
+    "mk_prop_computer"
+   ]
+  },
+  "i_terminal_blue": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_terminal_blue",
+   "library_items": [
+    "mk_prop_computer",
+    "pad_blue"
+   ],
+   "third_party_items": [
+    "mk_prop_computer"
+   ]
+  },
+  "i_terminal_violet": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_terminal_violet",
+   "library_items": [
+    "mk_prop_computer",
+    "pad_violet"
+   ],
+   "third_party_items": [
+    "mk_prop_computer"
+   ]
+  },
+  "i_terminal_mint": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_terminal_mint",
+   "library_items": [
+    "mk_prop_computer",
+    "pad_mint"
+   ],
+   "third_party_items": [
+    "mk_prop_computer"
+   ]
+  },
+  "i_case_bacs": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_case_bacs",
+   "library_items": [
+    "case_bacs",
+    "pad_blue"
+   ],
+   "third_party_items": []
+  },
+  "i_cabinet_secure": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_cabinet_secure",
+   "library_items": [
+    "cabinet_secure",
+    "pad_blue"
+   ],
+   "third_party_items": []
+  },
+  "i_node_bronze": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_node_bronze",
+   "library_items": [
+    "node_bronze",
+    "pad_periwinkle"
+   ],
+   "third_party_items": []
+  },
+  "i_node_silver": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_node_silver",
+   "library_items": [
+    "node_silver",
+    "pad_periwinkle"
+   ],
+   "third_party_items": []
+  },
+  "i_node_gold": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_node_gold",
+   "library_items": [
+    "node_gold",
+    "pad_periwinkle"
+   ],
+   "third_party_items": []
+  },
+  "i_screen_dashboard": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_screen_dashboard",
+   "library_items": [
+    "pad_periwinkle",
+    "screen_dashboard"
+   ],
+   "third_party_items": []
+  },
+  "i_screen_alert": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_screen_alert",
+   "library_items": [
+    "pad_amber",
+    "screen_alert"
+   ],
+   "third_party_items": []
+  },
+  "i_table_map": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_table_map",
+   "library_items": [
+    "pad_amber",
+    "table_map"
+   ],
+   "third_party_items": []
+  },
+  "i_coffee": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "i_coffee",
+   "library_items": [
+    "kn_kitchenCoffeeMachine",
+    "kn_sideTableDrawers",
+    "pad_amber"
+   ],
+   "third_party_items": [
+    "kn_kitchenCoffeeMachine",
+    "kn_sideTableDrawers"
+   ]
+  },
+  "d_desk_set": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_desk_set",
+   "library_items": [
+    "kn_chairDesk",
+    "kn_computerKeyboard",
+    "kn_computerScreen",
+    "kn_desk"
+   ],
+   "third_party_items": [
+    "kn_chairDesk",
+    "kn_computerKeyboard",
+    "kn_computerScreen",
+    "kn_desk"
+   ]
+  },
+  "d_desk_laptop": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_desk_laptop",
+   "library_items": [
+    "kn_deskCorner",
+    "kn_laptop"
+   ],
+   "third_party_items": [
+    "kn_deskCorner",
+    "kn_laptop"
+   ]
+  },
+  "d_chair": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_chair",
+   "library_items": [
+    "kn_chairDesk"
+   ],
+   "third_party_items": [
+    "kn_chairDesk"
+   ]
+  },
+  "d_plant": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_plant",
+   "library_items": [
+    "kn_pottedPlant"
+   ],
+   "third_party_items": [
+    "kn_pottedPlant"
+   ]
+  },
+  "d_plant_small": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_plant_small",
+   "library_items": [
+    "kn_plantSmall1"
+   ],
+   "third_party_items": [
+    "kn_plantSmall1"
+   ]
+  },
+  "d_bookcase": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_bookcase",
+   "library_items": [
+    "kn_bookcaseClosedDoors"
+   ],
+   "third_party_items": [
+    "kn_bookcaseClosedDoors"
+   ]
+  },
+  "d_bookcase2": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_bookcase2",
+   "library_items": [
+    "kn_bookcaseClosed"
+   ],
+   "third_party_items": [
+    "kn_bookcaseClosed"
+   ]
+  },
+  "d_sofa": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_sofa",
+   "library_items": [
+    "kn_loungeSofa"
+   ],
+   "third_party_items": [
+    "kn_loungeSofa"
+   ]
+  },
+  "d_table": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_table",
+   "library_items": [
+    "kn_tableCoffeeSquare"
+   ],
+   "third_party_items": [
+    "kn_tableCoffeeSquare"
+   ]
+  },
+  "d_lamp": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_lamp",
+   "library_items": [
+    "kn_lampRoundFloor"
+   ],
+   "third_party_items": [
+    "kn_lampRoundFloor"
+   ]
+  },
+  "d_coatrack": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_coatrack",
+   "library_items": [
+    "kn_coatRack"
+   ],
+   "third_party_items": [
+    "kn_coatRack"
+   ]
+  },
+  "d_box": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_box",
+   "library_items": [
+    "kn_cardboardBoxClosed",
+    "mk_prop_crate3"
+   ],
+   "third_party_items": [
+    "kn_cardboardBoxClosed",
+    "mk_prop_crate3"
+   ]
+  },
+  "d_rug": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_rug",
+   "library_items": [
+    "kn_rugRectangle"
+   ],
+   "third_party_items": [
+    "kn_rugRectangle"
+   ]
+  },
+  "d_crate": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_crate",
+   "library_items": [
+    "mk_prop_crate3"
+   ],
+   "third_party_items": [
+    "mk_prop_crate3"
+   ]
+  },
+  "d_fan": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_fan",
+   "library_items": [
+    "mk_prop_fan_small"
+   ],
+   "third_party_items": [
+    "mk_prop_fan_small"
+   ]
+  },
+  "d_itemholder": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_itemholder",
+   "library_items": [
+    "mk_prop_itemholder"
+   ],
+   "third_party_items": [
+    "mk_prop_itemholder"
+   ]
+  },
+  "d_chest": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_chest",
+   "library_items": [
+    "mk_prop_chest"
+   ],
+   "third_party_items": [
+    "mk_prop_chest"
+   ]
+  },
+  "d_floorlight": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_floorlight",
+   "library_items": [
+    "mk_prop_light_floor"
+   ],
+   "third_party_items": [
+    "mk_prop_light_floor"
+   ]
+  },
+  "d_cable_tray": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_cable_tray",
+   "library_items": [
+    "mk_prop_cable_3"
+   ],
+   "third_party_items": [
+    "mk_prop_cable_3"
+   ]
+  },
+  "d_vent": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_vent",
+   "library_items": [
+    "mk_prop_vent_big"
+   ],
+   "third_party_items": [
+    "mk_prop_vent_big"
+   ]
+  },
+  "d_pipes_col": {
+   "atlas": "assets/props/atlas.json",
+   "frame": "d_pipes_col",
+   "library_items": [
+    "mk_column_pipes"
+   ],
+   "third_party_items": [
+    "mk_column_pipes"
+   ]
+  },
+  "eng_se_idle_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_idle_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_idle_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_idle_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_4": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_4",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_5": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_5",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_6": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_6",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_walk_7": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_walk_7",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_scan_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_scan_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_scan_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_scan_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_scan_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_scan_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_scan_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_scan_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_repair_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_repair_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_repair_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_repair_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_repair_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_repair_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_repair_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_repair_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_success_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_success_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_success_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_success_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_success_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_success_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_se_success_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_se_success_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_idle_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_idle_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_idle_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_idle_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_4": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_4",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_5": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_5",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_6": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_6",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_walk_7": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_walk_7",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_scan_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_scan_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_scan_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_scan_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_scan_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_scan_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_scan_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_scan_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_repair_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_repair_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_repair_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_repair_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_repair_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_repair_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_repair_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_repair_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_success_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_success_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_success_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_success_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_success_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_success_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_sw_success_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_sw_success_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_idle_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_idle_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_idle_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_idle_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_4": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_4",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_5": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_5",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_6": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_6",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_walk_7": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_walk_7",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_scan_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_scan_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_scan_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_scan_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_scan_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_scan_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_scan_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_scan_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_repair_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_repair_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_repair_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_repair_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_repair_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_repair_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_repair_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_repair_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_success_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_success_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_success_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_success_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_success_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_success_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_nw_success_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_nw_success_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_idle_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_idle_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_idle_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_idle_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_4": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_4",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_5": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_5",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_6": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_6",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_walk_7": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_walk_7",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_scan_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_scan_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_scan_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_scan_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_scan_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_scan_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_scan_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_scan_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_repair_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_repair_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_repair_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_repair_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_repair_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_repair_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_repair_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_repair_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_success_0": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_success_0",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_success_1": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_success_1",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_success_2": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_success_2",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "eng_ne_success_3": {
+   "atlas": "assets/characters/atlas.json",
+   "frame": "eng_ne_success_3",
+   "library_items": [
+    "char_engineer",
+    "anim_ual1"
+   ],
+   "third_party_items": [
+    "char_engineer",
+    "anim_ual1"
+   ]
+  },
+  "bug_gremlin": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "bug_gremlin",
+   "library_items": [
+    "bug_gremlin"
+   ],
+   "third_party_items": []
+  },
+  "bug_fixed": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "bug_fixed",
+   "library_items": [
+    "bug_fixed"
+   ],
+   "third_party_items": []
+  },
+  "malware_spike": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "malware_spike",
+   "library_items": [
+    "malware_spike"
+   ],
+   "third_party_items": []
+  },
+  "wisp": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "wisp",
+   "library_items": [
+    "wisp"
+   ],
+   "third_party_items": []
+  },
+  "corrupt_file": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "corrupt_file",
+   "library_items": [
+    "corrupt_file"
+   ],
+   "third_party_items": []
+  },
+  "ghost_receipt": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "ghost_receipt",
+   "library_items": [
+    "ghost_receipt"
+   ],
+   "third_party_items": []
+  },
+  "fx_scan_ring": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_scan_ring",
+   "library_items": [
+    "fx_scan_ring"
+   ],
+   "third_party_items": []
+  },
+  "fx_quarantine_amber": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_quarantine_amber",
+   "library_items": [
+    "fx_quarantine_amber"
+   ],
+   "third_party_items": []
+  },
+  "fx_quarantine_coral": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_quarantine_coral",
+   "library_items": [
+    "fx_quarantine_coral"
+   ],
+   "third_party_items": []
+  },
+  "fx_repair": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_repair",
+   "library_items": [
+    "fx_repair"
+   ],
+   "third_party_items": []
+  },
+  "fx_success": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_success",
+   "library_items": [
+    "fx_success"
+   ],
+   "third_party_items": []
+  },
+  "fx_light_mint": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_light_mint",
+   "library_items": [
+    "fx_light_mint"
+   ],
+   "third_party_items": []
+  },
+  "fx_light_amber": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_light_amber",
+   "library_items": [
+    "fx_light_amber"
+   ],
+   "third_party_items": []
+  },
+  "fx_light_coral": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_light_coral",
+   "library_items": [
+    "fx_light_coral"
+   ],
+   "third_party_items": []
+  },
+  "fx_light_cyan": {
+   "atlas": "assets/effects/atlas.json",
+   "frame": "fx_light_cyan",
+   "library_items": [
+    "fx_light_cyan"
+   ],
+   "third_party_items": []
+  },
+  "tool_scanner": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_scanner",
+   "library_items": [
+    "tool_scanner"
+   ],
+   "third_party_items": []
+  },
+  "tool_lens": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_lens",
+   "library_items": [
+    "tool_lens"
+   ],
+   "third_party_items": []
+  },
+  "tool_quarantine": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_quarantine",
+   "library_items": [
+    "tool_quarantine"
+   ],
+   "third_party_items": []
+  },
+  "tool_patch": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_patch",
+   "library_items": [
+    "tool_patch"
+   ],
+   "third_party_items": []
+  },
+  "tool_token": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_token",
+   "library_items": [
+    "tool_token"
+   ],
+   "third_party_items": []
+  },
+  "tool_restore": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_restore",
+   "library_items": [
+    "tool_restore"
+   ],
+   "third_party_items": []
+  },
+  "tool_recon": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_recon",
+   "library_items": [
+    "tool_recon"
+   ],
+   "third_party_items": []
+  },
+  "tool_reroute": {
+   "atlas": "assets/ui/atlas.json",
+   "frame": "tool_reroute",
+   "library_items": [
+    "tool_reroute"
+   ],
+   "third_party_items": []
+  }
+ }
+}
