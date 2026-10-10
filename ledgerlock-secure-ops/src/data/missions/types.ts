@@ -11,8 +11,11 @@ export interface MissionApi {
   clue(id: string, label: string, text: string): void;
   evidence(id: string): boolean;                       // retrieve evidence (checks the room pass)
   status(target: string, st: 'suspect' | 'bad' | 'ok' | 'fixed' | undefined): void;
-  adjust(metric: 'integrity' | 'protection', d: number, why?: string): void;
+  adjust(metric: 'integrity' | 'protection' | 'recovery' | 'audit', d: number, why?: string): void;
+  grantPass(pass: PassId, why?: string): void;
+  revokePass(pass: PassId): void;
   hit(key: string, availability: number, seconds?: number): void;
+  clearHit(key: string): void;
   entity(id: string, patch: Record<string, unknown>): void;
   removeEntity(id: string): void;
   fx(type: 'scan' | 'sparkle' | 'alarm' | 'barrier' | 'release' | 'pass' | 'repair', target: string): void;
@@ -29,8 +32,8 @@ export interface MissionApi {
 export interface Rule {
   tool: ToolId;
   target: string | string[] | ((id: string) => boolean);
-  requires?: (s: GameState) => true | string;
-  confirm?: (s: GameState) => { title: string; body: string; impacts: { label: string; text: string; tone: Tone }[]; confirmLabel?: string } | null;
+  requires?: (s: GameState, targetId: string) => true | string;
+  confirm?: (s: GameState, targetId: string) => { title: string; body: string; impacts: { label: string; text: string; tone: Tone }[]; confirmLabel?: string } | null;
   run: (a: MissionApi, t: TargetInfo) => void;
 }
 
@@ -46,6 +49,10 @@ export interface ContainmentCfg {
   onRelease?: (a: MissionApi) => void;
   onReroute?: (a: MissionApi) => void;
 }
+
+export type GoalKind = 'primary' | 'optional' | 'stretch';
+export interface GoalDef { id: string; kind: GoalKind; text: string; hint?: string; done: (s: GameState) => boolean }
+export interface Recordable { id: string; label: string; when: (s: GameState) => boolean }
 
 export interface ObjectiveDef { id: string; text: string; hint: string; done: (s: GameState) => boolean }
 
@@ -81,10 +88,23 @@ export interface MissionDef {
   /** Outline missions describe clues/choices/success for the mission select screen. */
   outline?: { objective: string; clues: string[]; choices: string[]; success: string; debrief: string };
   parSeconds: number;
+  /** Campaign order (1-8), or 0 for the side-task hub. */
+  order: number;
+  /** Campaign goal contribution blurb shown on mission select. */
+  theme: string;
+  goals: GoalDef[];
+  /** Results the player may record on the Evidence Board (audit quality; some optional goals need them). */
+  recordables?: Recordable[];
+  /** Passes this mission genuinely needs (anything else counts against Least Privilege). */
+  requiredPasses?: PassId[];
+  /** Short explanation of the safest next step, shown in the debrief. */
+  nextStep: (s: GameState) => string;
+  onRevoke?: (a: MissionApi, pass: PassId) => void;
 }
 
 export interface ScoreInput {
   diagnosed: boolean; verified: boolean; reconciled: boolean;
   narrow: number; privacyOk: boolean;
 }
+
 export type { ResultCard };

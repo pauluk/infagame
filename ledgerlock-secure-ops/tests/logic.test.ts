@@ -6,6 +6,9 @@ import { findPath, walkableFor } from '../src/game/systems/Grid';
 import { GameState } from '../src/game/systems/GameState';
 import { MissionRunner } from '../src/game/systems/MissionRunner';
 import { computeScore } from '../src/game/systems/Scoring';
+import { Campaign, evaluateBadges } from '../src/game/systems/Campaign';
+import { measuresOf, overallConfidence } from '../src/game/systems/Confidence';
+import type { ScenarioMission } from '../src/data/missions/scenario';
 import { MISSIONS } from '../src/data/missions';
 import duplicateGhost from '../src/data/missions/duplicateGhost';
 import type { PassId, RoomId } from '../src/game/types';
@@ -155,28 +158,140 @@ describe('Duplicate Ghost mission logic', () => {
   });
 });
 
-describe('all missions load on the same engine', () => {
-  it('has the tutorial plus four follow-on scenarios with objectives, clues, choices and a debrief', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror']);
-    for (const m of MISSIONS.slice(1)) { expect(m.outline!.clues.length).toBeGreaterThan(1); expect(m.outline!.choices.length).toBeGreaterThan(1); expect(m.objectives.length).toBeGreaterThan(5); expect(m.debrief(new GameState(m)).what.length).toBeGreaterThan(20); }
+describe('campaign missions', () => {
+  it('has the tutorial, seven further campaign missions in order, and the side-task hub', () => {
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
-  it('follow-on scenarios can be completed through passes, evidence, response and verification', () => {
-    for (const m of MISSIONS.slice(1)) {
-      const s = new GameState(m); const run = new MissionRunner(s); run.start(); const d = dialogs(s);
-      s.flags.briefed = true;
-      const [p1, p2] = Object.keys(m.passGrants) as PassId[];
-      run.requestPass(p1, 'desk'); expect(s.passes.has(p1)).toBe(true);
-      const [ev1, ev2] = m.evidence;
-      s.passes.add(p1); run.api.evidence(ev1.id); s.flags.ev1 = true;
-      run.requestPass(p2, 'reader'); expect(s.passes.has(p2)).toBe(true);
-      run.api.evidence(ev2.id); s.flags.ev2 = true;
-      const resp = Object.keys(m.interactions!).find((k) => !k.includes('incident_wall') && !k.includes(ev1.sourceRoom) && !k.includes(ev2.sourceRoom)) ?? Object.keys(m.interactions!).at(-1)!;
-      run.inspect(Object.keys(m.interactions!).at(-1)!);
-      const choice = d.at(-1) as any; expect(choice.type).toBe('choice'); choice.onChoose(choice.options[0].id);
-      expect(s.flags.fixed, resp).toBe(true);
-      s.selectedTool = 'scanner'; run.interact('route:' + m.incidentRoute); expect(s.flags.verified).toBe(true);
-      expect(m.canReport(s)).toBe(true); run.fileReport(); expect(s.complete).toBe(true);
+  it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
+    for (const m of MISSIONS) {
+      const kinds = new Set(m.goals.map((g) => g.kind));
+      if (m.order > 0) expect(kinds.has('primary'), m.id).toBe(true);
+      expect(kinds.has('optional'), m.id).toBe(true); expect(kinds.has('stretch'), m.id).toBe(true);
+      const s = new GameState(m);
+      expect(m.debrief(s).what.length).toBeGreaterThan(20); expect(m.nextStep(s).length).toBeGreaterThan(10);
+      for (const e of m.evidence) { expect(e.sourceRoom).toBeTruthy(); expect(PASSES[e.requiredPass]).toBeDefined(); }
     }
+  });
+  it('the primary goals match the brief for each mission', () => {
+    const count = Object.fromEntries(MISSIONS.map((m) => [m.id, m.goals.filter((g) => g.kind === 'primary').length]));
+    expect(count['duplicate-ghost']).toBe(6); expect(count['bacs-after-dark']).toBe(6); expect(count['collection-connection']).toBe(6);
+    expect(count['event-stream-tide']).toBe(5); expect(count['fabric-mirror']).toBe(6); expect(count['token-on-the-table']).toBe(6);
+    expect(count['clean-restore']).toBe(6); expect(count['root-of-the-ripple']).toBe(6);
+  });
+});
+
+/** Drives a scenario mission through its scripted (best-practice) path using only the public runner API. */
+function runScript(m: ScenarioMission, opts: { skipRecord?: boolean } = {}) {
+  const s = new GameState(m); const run = new MissionRunner(s); run.start(); const d = dialogs(s);
+  s.flags.briefed = true;
+  const handle = () => {
+    for (let i = 0; i < 8 && d.length; i++) {
+      const dlg = d.shift();
+      if (dlg.type === 'confirm') dlg.onConfirm();
+      else if (dlg.type === 'choice') { const step = m.spec.steps.find((x) => x.choice && x.choice.title === dlg.title); const o = step?.choice?.options.find((x) => x.correct) ?? step!.choice!.options[0]; dlg.onChoose(o.id); }
+      else if (dlg.type === 'timeline' && dlg.onClose) dlg.onClose();
+    }
+  };
+  const interactStep = (id: string) => {
+    const x = m.spec.steps.find((q) => q.id === id)!; const at = Array.isArray(x.at) ? x.at[0] : x.at;
+    s.selectedTool = x.tool === 'e' ? 'scanner' : x.tool; if (x.tool === 'e') run.inspect(at); else run.interact(at);
+    handle();
+  };
+  for (const act of m.script) {
+    const [k, v] = act as [string, any];
+    if (k === 'pass') { run.requestPass(v, 'desk'); }
+    else if (k === 'step') interactStep(v);
+    else if (k === 'contain') { const c = m.spec.contain!.find((q) => q.id === v)!; s.selectedTool = 'quarantine'; run.interact(c.target); handle(); }
+    else if (k === 'release') { const c = m.spec.contain!.find((q) => q.id === v)!; s.selectedTool = 'quarantine'; run.interact(c.target); handle(); }
+    else if (k === 'wait') for (let t = 0; t < v * 2; t++) run.tick(0.5);
+    else if (k === 'record') { if (!opts.skipRecord) run.record(v); }
+    else if (k === 'report') run.fileReport();
+  }
+  return { s, run };
+}
+
+describe('every campaign mission can be completed through its scripted path', () => {
+  for (const m of MISSIONS.filter((x) => (x as ScenarioMission).script)) {
+    it(`${m.id}: primary goals done, mission completes, optional goals reachable`, () => {
+      const { s } = runScript(m as ScenarioMission);
+      for (const g of m.goals.filter((x) => x.kind === 'primary')) expect(g.done(s), `${m.id} primary: ${g.text}`).toBe(true);
+      expect(s.complete, `${m.id} complete`).toBe(true);
+      const opt = m.goals.filter((x) => x.kind === 'optional');
+      expect(opt.filter((g) => g.done(s)).length, `${m.id} optional`).toBeGreaterThanOrEqual(Math.min(2, opt.length));
+    });
+  }
+  it('cannot be completed by skipping primary objectives', () => {
+    for (const m of MISSIONS.filter((x) => (x as ScenarioMission).script && x.order > 0)) {
+      const s = new GameState(m); const run = new MissionRunner(s); run.start();
+      run.fileReport(); expect(s.complete, m.id).toBe(false);
+    }
+  });
+  it('optional objectives never block completion: failing every optional goal still finishes', () => {
+    const m = MISSIONS.find((x) => x.id === 'bacs-after-dark') as ScenarioMission;
+    const { s } = runScript(m, { skipRecord: true });
+    expect(s.complete).toBe(true); expect(m.goals.find((g) => g.id === 'o3')!.done(s)).toBe(false);
+  });
+});
+
+describe('Service Confidence and campaign storage', () => {
+  it('rewards balance: shutting everything down or skipping checks both lower confidence', () => {
+    const m = MISSIONS[0]; const good = new GameState(m); const shut = new GameState(m); const rush = new GameState(m);
+    shut.hits.a = { availability: 70 }; rush.integrity = 40;
+    const oc = (s: GameState) => overallConfidence(measuresOf(s));
+    expect(oc(good)).toBeGreaterThan(oc(shut)); expect(oc(good)).toBeGreaterThan(oc(rush));
+    expect(measuresOf(shut).integrity).toBe(100); expect(measuresOf(rush).availability).toBe(100);   // one strong measure is not enough
+  });
+  it('persists progress locally, unlocks missions in order, supports replay and reset', () => {
+    const mem = new Map<string, string>(); const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
+    const c = new Campaign(store);
+    const [m1, m2, m3, m4] = MISSIONS;
+    expect(c.isUnlocked(m1, MISSIONS)).toBe(true); expect(c.isUnlocked(m2, MISSIONS)).toBe(false);
+    const { s } = runScript(m2 as ScenarioMission);   // play m2 directly to produce a result (unlock gating is a UI/campaign rule)
+    const out = c.recordResult(s);
+    expect(out.after.integrity).not.toBe(out.before.integrity + 999);
+    expect(c.isCompleted(m2.id)).toBe(true);
+    c.recordResult(s);                                  // replay keeps best and increments plays
+    expect(c.data.missions[m2.id].plays).toBe(2);
+    expect(JSON.parse(mem.get('ledgerlock.campaign.v1')!).missions[m2.id].completed).toBe(true);
+    const c2 = new Campaign(store); expect(c2.isCompleted(m2.id)).toBe(true);
+    expect(c2.isUnlocked(m1, MISSIONS)).toBe(true); expect(c2.isUnlocked(m3, MISSIONS)).toBe(true); expect(c2.isUnlocked(m4, MISSIONS)).toBe(false);
+    c2.reset(); expect(c2.isCompleted(m2.id)).toBe(false);
+    expect(JSON.stringify([...mem.values()])).not.toMatch(/password|secret|token_value/i);
+  });
+  it('awards badges from what actually happened', () => {
+    const { s } = runScript(MISSIONS.find((m) => m.id === 'bacs-after-dark') as ScenarioMission);
+    const b = evaluateBadges(s);
+    expect(b).toContain('precision'); expect(b).toContain('least_privilege'); expect(b).toContain('ledger_listener'); expect(b).toContain('good_evidence');
+    const r = runScript(MISSIONS.find((m) => m.id === 'clean-restore') as ScenarioMission);
+    expect(evaluateBadges(r.s)).toContain('clean_restore');
+    const e = runScript(MISSIONS.find((m) => m.id === 'event-stream-tide') as ScenarioMission);
+    expect(evaluateBadges(e.s)).toContain('no_lost_events');
+    // a broad containment loses Precision Over Panic
+    const broad = new GameState(MISSIONS[0]); broad.data.containments = [{ target: 'room:event_stream', narrow: 0.45 }];
+    expect(evaluateBadges(broad)).not.toContain('precision');
+  });
+  it('side-task hub tasks are recorded as side objectives', () => {
+    const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
+    const hub = MISSIONS.find((m) => m.id === 'ops-floor') as ScenarioMission;
+    const { s } = runScript(hub);
+    c.recordResult(s); expect(c.data.side).toContain('alert_routing'); expect(c.data.side).toContain('close_log');
+  });
+  it('revoking an unneeded pass removes access and raises data protection', () => {
+    const hub = MISSIONS.find((m) => m.id === 'ops-floor')!;
+    const s = new GameState(hub); const run = new MissionRunner(s); run.start();
+    expect(s.passes.has('service_audit_pass')).toBe(true);
+    s.protection = 80; run.revoke('service_audit_pass');
+    expect(s.passes.has('service_audit_pass')).toBe(false); expect(s.protection).toBeGreaterThan(80); expect(s.flags.st_revoke_pass).toBe(true);
+    run.revoke('ops_pass'); expect(s.passes.has('ops_pass')).toBe(true);
+  });
+  it('time-limited rotation pass expires; unneeded passes cost data protection', () => {
+    const m = MISSIONS.find((x) => x.id === 'token-on-the-table')!;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    run.grant('token_rotation_pass'); expect(s.passes.has('token_rotation_pass')).toBe(true);
+    for (let i = 0; i < 400; i++) run.tick(1);
+    expect(s.passes.has('token_rotation_pass')).toBe(false); expect(s.flags.expired_token_rotation_pass).toBe(true);
+    const before = s.protection; run.grant('bacs_audit_pass'); expect(s.protection).toBeLessThan(before);
   });
 });
 

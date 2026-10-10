@@ -43,6 +43,12 @@ export class GameState extends Emitter<StateEvents> {
   data: Record<string, any> = {};
   integrity = 100;
   protection = 100;
+  recovery = 70;                  // recovery readiness
+  audit = 40;                     // audit quality
+  affected: Record<string, string> = {};     // route/room -> worst state it reached (for the debrief)
+  passExpiry: Record<string, number> = {};   // pass -> elapsed seconds when it expires
+  revoked: PassId[] = [];
+  recordsMade: string[] = [];
   freshness = 2;
   incidents = 1;
   elapsed = 0;
@@ -72,7 +78,7 @@ export class GameState extends Emitter<StateEvents> {
   }
   changed(): void { this.emit('change', this); }
   setFlag(k: string, v = true): void { if (this.flags[k] !== v) { this.flags[k] = v; this.changed(); } }
-  adjust(metric: 'integrity' | 'protection', d: number): void { this[metric] = clamp(this[metric] + d); this.changed(); }
+  adjust(metric: 'integrity' | 'protection' | 'recovery' | 'audit', d: number): void { this[metric] = clamp(this[metric] + d); this.changed(); }
   setStatus(target: string, st: Status | undefined): void { if (st) this.status[target] = st; else delete this.status[target]; this.changed(); }
   addClue(id: string, label: string, text: string): boolean {
     if (this.clues.has(id)) return false;

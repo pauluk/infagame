@@ -1,6 +1,6 @@
 import type { PassId, RoomId } from '../game/types';
 
-export interface PassDef { id: PassId; name: string; room: RoomId; scope: string; hint: string }
+export interface PassDef { id: PassId; name: string; room: RoomId; scope: string; hint: string; special?: boolean; minutes?: number }
 
 /** Fictional, mission-scoped, read-only passes. They expire when the mission ends. */
 export const PASSES: Record<PassId, PassDef> = {
@@ -15,6 +15,7 @@ export const PASSES: Record<PassId, PassDef> = {
   debt_read_pass: { id: 'debt_read_pass', name: 'Debt Read Pass', room: 'debt_recovery', scope: 'Read-only masked debt and receipt evidence', hint: 'Request this when evidence points at debt records or receipts.' },
   agency_audit_pass: { id: 'agency_audit_pass', name: 'Agency Audit Pass', room: 'agency_handoff', scope: 'Read-only transfer manifest and delivery receipt', hint: 'Request this when an agency export looks wrong.' },
   fabric_observer_pass: { id: 'fabric_observer_pass', name: 'Fabric Observer Pass', room: 'fabric_platform', scope: 'Read-only synthetic Bronze/Silver/Gold pipeline status', hint: 'Request this once a fix is ready to verify in reporting.' },
+  token_rotation_pass: { id: 'token_rotation_pass', name: 'Token Rotation Pass', room: 'secure_ops', scope: 'Time-limited approval to rotate one simulated service credential via the Access Desk', hint: 'Request this once you know which service credential may be exposed.', special: true, minutes: 12 },
   integration_audit_pass: { id: 'integration_audit_pass', name: 'Integration Audit Pass', room: 'integration_exchange', scope: 'Read-only transfer status and routing metadata', hint: 'Request this when evidence points at a secure transfer.' },
 };
-export const PASS_BY_ROOM = Object.fromEntries(Object.values(PASSES).map((p) => [p.room, p.id])) as Record<RoomId, PassId>;
+export const PASS_BY_ROOM = Object.fromEntries(Object.values(PASSES).filter((p) => !p.special).map((p) => [p.room, p.id])) as Record<RoomId, PassId>;

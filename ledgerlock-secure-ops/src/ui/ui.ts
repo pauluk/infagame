@@ -7,7 +7,9 @@ import { settings } from '../game/systems/Settings';
 import { sfx } from '../game/systems/Sfx';
 import { computeScore } from '../game/systems/Scoring';
 import { TOOLS, TOOL_BY_ID } from '../data/tools';
-import { MISSIONS, MISSION_BY_ID } from '../data/missions';
+import { CAMPAIGN_GOAL, CAMPAIGN_MISSIONS, MISSIONS, MISSION_BY_ID } from '../data/missions';
+import { BADGES, campaign } from '../game/systems/Campaign';
+import { MEASURE_KEYS, MEASURE_LABEL, confidenceWord, measuresOf, overallConfidence, type Measures } from '../game/systems/Confidence';
 import { PASSES } from '../data/passes';
 import { FAC_H, FAC_W, FAC_X0, FAC_Y0, GRID, ROOMS, ROOM_BY_ID, EXTERNAL_BY_ID, EXTERNALS } from '../data/map';
 import { ROUTES, ROUTE_BY_ID, STATE_LABEL, routePoints } from '../data/routes';
@@ -84,7 +86,7 @@ export class UI {
       </div>`, 'clear');
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
-      if (a === 'start') this.startMission('duplicate-ghost');
+      if (a === 'start') this.startMission(this.nextMission().id);
       if (a === 'missions') this.showMissionSelect();
       if (a === 'howto') this.showHowTo(() => this.showTitle());
       if (a === 'audio') this.showSettings('audio', () => this.showTitle());
@@ -93,20 +95,46 @@ export class UI {
     (s.querySelector('button.primary') as HTMLElement).focus();
   }
 
-  showMissionSelect(): void {
-    const cards = MISSIONS.map((m) => {
-      const o = m.outline;
-      return `<div class="mcard"><h3>${esc(m.title)} <span class="chip ${m.status === 'playable' ? 'good' : 'info'}">${m.id === 'duplicate-ghost' ? 'Tutorial · full' : 'Playable · simplified'}</span></h3>
-        <div class="small">${esc(m.tagline)}</div>
-        ${o ? `<div class="small"><b>Objective:</b> ${esc(o.objective)}</div><div class="small"><b>Clues:</b><ul>${o.clues.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>
-        <div class="small"><b>Response choices:</b><ul>${o.choices.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>
-        <div class="small"><b>Success:</b> ${esc(o.success)}</div>` : `<div class="small">About 5 minutes. Movement, passes, evidence, scanning, containment, patching, reconciliation and verification.</div>`}
-        <button class="primary" data-m="${m.id}">Play</button></div>`;
+  /** The first unlocked campaign mission that is not yet completed (or the tutorial). */
+  nextMission() {
+    return CAMPAIGN_MISSIONS.find((m) => !campaign.isCompleted(m.id) && campaign.isUnlocked(m, MISSIONS)) ?? CAMPAIGN_MISSIONS[0];
+  }
+
+  private measureBars(m: Measures, before?: Measures): string {
+    return MEASURE_KEYS.map((k) => {
+      const L = MEASURE_LABEL[k]; const d = before ? m[k] - before[k] : 0;
+      return `<div class="mrow" title="${esc(L.what)}"><span>${L.icon} ${esc(L.name)}</span><div class="bar2"><i style="width:${m[k]}%"></i></div><b>${m[k]}%</b>${before ? `<small>${d > 0 ? '▲ +' + d : d < 0 ? '▼ ' + d : '• 0'}</small>` : ''}</div>`;
     }).join('');
-    const s = this.showScreen(`<div class="card wide"><h2>Mission Select</h2><div class="grid2">${cards}</div><div class="row" style="margin-top:12px"><button data-a="back">← Back</button></div></div>`);
+  }
+  private badgeShelf(earned: string[], fresh: string[] = []): string {
+    return `<div class="badges">${BADGES.map((b) => `<span class="badge ${earned.includes(b.id) ? 'got' : ''}" title="${esc(b.text)}">${b.icon} ${esc(b.name)}${fresh.includes(b.id) ? ' <b>NEW</b>' : ''}<small>${earned.includes(b.id) ? '✓ earned' : esc(b.text)}</small></span>`).join('')}</div>`;
+  }
+
+  showMissionSelect(): void {
+    const cm = campaign.data.measures;
+    const card = (m: (typeof MISSIONS)[number]) => {
+      const rec = campaign.data.missions[m.id]; const unlocked = campaign.isUnlocked(m, MISSIONS);
+      const prim = m.goals.filter((g) => g.kind === 'primary'), opt = m.goals.filter((g) => g.kind === 'optional'), str = m.goals.filter((g) => g.kind === 'stretch');
+      const prev = CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
+      const status = rec?.completed ? `<span class="chip good">✓ Completed · best ${rec.best}/100</span>` : unlocked ? '<span class="chip info">Available</span>' : `<span class="chip warn">🔒 Locked: complete ${esc(prev?.title ?? 'the tutorial')}</span>`;
+      return `<div class="mcard ${unlocked ? '' : 'locked'}"><h3>${m.order ? m.order + '. ' : ''}${esc(m.title)} ${status}</h3><div class="small">${esc(m.tagline)}</div><div class="small"><i>${esc(m.theme)}</i></div>
+        ${prim.length ? `<div class="small"><b>Primary objectives (${rec ? rec.primary.length : 0}/${prim.length})</b><ul>${prim.map((g) => `<li>${rec?.primary.includes(g.id) ? '✓' : '○'} ${esc(g.text)}</li>`).join('')}</ul></div>` : ''}
+        <div class="small"><b>Optional</b> ${rec ? rec.optional.length : 0}/${opt.length} · <b>Stretch</b> ${rec ? rec.stretch.length : 0}/${str.length}${rec?.badges.length ? ' · ' + rec.badges.map((b) => BADGES.find((x) => x.id === b)?.icon ?? '').join(' ') : ''}</div>
+        <button class="primary" data-m="${m.id}" ${unlocked ? '' : 'disabled'}>${rec?.completed ? 'Replay (improve optional goals and badges)' : 'Play'}</button></div>`;
+    };
+    const s = this.showScreen(`<div class="card wide"><h2>Campaign</h2><p><b>Goal:</b> ${esc(CAMPAIGN_GOAL)}</p>
+      <div class="grid2"><div class="mcard"><h3>Service Confidence <span class="chip info">${campaign.overall()}% · ${confidenceWord(campaign.overall())}</span></h3>${this.measureBars(cm)}<div class="small">A high score needs balance: the weakest measure pulls it down.</div></div>
+      <div class="mcard"><h3>Badges</h3>${this.badgeShelf(campaign.data.badges)}<div class="small">Side tasks done: ${campaign.data.side.length}/6</div></div></div>
+      <h3 style="margin-top:14px">Missions</h3><div class="grid2">${CAMPAIGN_MISSIONS.map(card).join('')}</div>
+      <h3 style="margin-top:14px">Between missions</h3><div class="grid2">${MISSIONS.filter((m) => m.order === 0).map(card).join('')}</div>
+      <div class="row" style="margin-top:12px"><button data-a="back">← Back</button><button data-a="unlock" title="For testers: unlock every mission">Unlock all missions</button><button data-a="reset" class="danger">Reset campaign progress</button></div>
+      <p class="ext-note">Progress is stored only in this browser (local storage) and contains no finance data or credentials.</p></div>`);
     s.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button'); if (!b) return; sfx.click();
-      if (b.dataset.m) this.startMission(b.dataset.m); else if (b.dataset.a === 'back') this.showTitle();
+      if (b.dataset.m) this.startMission(b.dataset.m);
+      else if (b.dataset.a === 'back') this.showTitle();
+      else if (b.dataset.a === 'unlock') { campaign.unlockAll(); this.showMissionSelect(); }
+      else if (b.dataset.a === 'reset') { if (confirm('Reset all campaign progress, badges and side tasks on this device?')) { campaign.reset(); this.showMissionSelect(); } }
     });
   }
 
@@ -146,6 +174,7 @@ export class UI {
   // ===================================================================== mission lifecycle ====
   startMission(id: string): void {
     const mission = MISSION_BY_ID[id]; if (!mission || !app.game) return;
+    if (!campaign.isUnlocked(mission, MISSIONS)) { this.showMissionSelect(); return; }
     this.clearScreen();
     const sm = app.game.scene;
     sm.getScenes(true).forEach((sc) => sm.stop(sc.scene.key));
@@ -206,6 +235,8 @@ export class UI {
     ($(s, 'button.primary') as HTMLElement).focus();
   }
 
+  openGoals(): void { if (this.state && !this.dialogOpen && !this.pauseOpen) this.openDialog({ type: 'goals' }); }
+
   togglePause(): void {
     if (!this.state || this.dialogOpen) return;
     if (this.pauseOpen) { this.pauseOpen = false; this.clearScreen(); this.state.paused = false; return; }
@@ -227,24 +258,37 @@ export class UI {
 
   showDebrief(state: GameState): void {
     sfx.win();
-    const score = computeScore(state);
-    const deb = state.mission.debrief(state);
+    const out = campaign.recordResult(state);
+    const m = state.mission, score = out.score;
+    const deb = m.debrief(state);
     const sm = app.game!.scene; sm.getScenes(true).forEach((sc) => sm.stop(sc.scene.key)); sm.start('Debrief');
     this.detachMission();
+    const goalRows = (kind: 'primary' | 'optional' | 'stretch') => m.goals.filter((g) => g.kind === kind).map((g) => `<li>${g.done(state) ? '<span class="chip good">✓ Done</span>' : `<span class="chip ${kind === 'primary' ? 'bad' : ''}">${kind === 'primary' ? '✕ Missed' : '○ Not this time'}</span>`} ${esc(g.text)}</li>`).join('');
+    const affected = Object.entries(state.affected);
+    const nm = (id: string) => describeTarget(id)?.name ?? id;
+    const next = MISSIONS.filter((x) => x.order > 0).find((x) => x.order === m.order + 1);
+    const evRows = m.evidence.map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(ROOM_BY_ID[e.sourceRoom].name)}</td><td>${esc(PASSES[e.requiredPass].name)}</td><td>${esc(e.sensitivity)}</td><td>${state.evidence.has(e.id) ? '<span class="chip good">✓ Collected</span>' : '<span class="chip">○ Missing</span>'}</td></tr>`).join('');
     const s = this.showScreen(`<div class="card wide"><div class="row" style="align-items:flex-start;gap:20px">
-      <div style="flex:1;min-width:260px"><div class="chip good">Mission complete</div><h2 style="margin-top:6px">${esc(state.mission.title)}: debrief</h2>
-        <div class="score">${score.total}<span style="font-size:.35em;opacity:.8"> / 100</span></div><div class="sub">${esc(score.rating)}</div><p>${esc(score.message)}</p>
-        <table class="t">${score.parts.map((p) => `<tr><td>${esc(p.label)}<div class="bar2"><i style="width:${(p.points / p.max) * 100}%"></i></div><div class="small" style="opacity:.75">${esc(p.note)}</div></td><td style="white-space:nowrap"><b>${p.points}</b> / ${p.max}</td></tr>`).join('')}</table></div>
-      <div style="flex:1;min-width:260px"><h3>What happened</h3><p>${esc(deb.what)}</p><h3>Your response</h3><ul>${deb.response.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
-        <h3>Effect on service</h3><table class="t"><tr><th>Measure</th><th>Result</th></tr>
-          <tr><td>Service availability</td><td>average ${Math.round(state.stats.availSum / Math.max(1, state.stats.availTime))}%, lowest ${state.stats.minAvail}%</td></tr>
-          <tr><td>Transaction integrity</td><td>${state.integrity}% at the end</td></tr><tr><td>Data protection</td><td>${state.protection}% (masked, read-only evidence only)</td></tr>
-          <tr><td>Passes used</td><td>${[...state.passes].filter((p) => p !== 'ops_pass').map((p) => esc(PASSES[p].name)).join(', ') || 'none'} (expired now)</td></tr></table>
-        <h3>What to take away</h3><p>${esc(deb.learn)}</p></div></div>
-      <div class="row" style="margin-top:10px"><button class="primary" data-a="again">Replay mission</button><button data-a="missions">Mission Select</button><button data-a="title">Title</button></div></div>`);
+      <div style="flex:1;min-width:280px"><div class="chip good">Mission complete</div><h2 style="margin-top:6px">${esc(m.title)}: debrief</h2>
+        ${m.order === 0 ? `<div class="score">${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}<span style="font-size:.35em;opacity:.8"> / 6 side tasks</span></div><div class="sub">Operations hygiene</div><p>Small habits prevent the next incident. Nothing here affects campaign progress.</p>` : `<div class="score">${score.total}<span style="font-size:.35em;opacity:.8"> / 100</span></div><div class="sub">${esc(score.rating)}</div><p>${esc(score.message)}</p>`}
+        <h3>Objectives</h3><div class="small"><b>Primary</b></div><ul class="goals">${goalRows('primary') || '<li>None: this is a free-roam shift.</li>'}</ul>
+        <div class="small"><b>Optional</b> (${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}/${m.goals.filter((g) => g.kind === 'optional').length})</div><ul class="goals">${goalRows('optional')}</ul>
+        <div class="small"><b>Stretch</b></div><ul class="goals">${goalRows('stretch')}</ul>
+        <h3>Badges</h3>${this.badgeShelf(out.badges.concat(campaign.data.badges.filter((b) => !out.badges.includes(b))), out.newBadges)}
+        <table class="t" style="margin-top:8px">${(m.order === 0 ? [] : score.parts).map((p) => `<tr><td>${esc(p.label)}<div class="bar2"><i style="width:${(p.points / p.max) * 100}%"></i></div><div class="small" style="opacity:.75">${esc(p.note)}</div></td><td style="white-space:nowrap"><b>${p.points}</b> / ${p.max}</td></tr>`).join('')}</table></div>
+      <div style="flex:1;min-width:280px"><h3>What happened</h3><p>${esc(deb.what)}</p><h3>Your response</h3><ul>${deb.response.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+        <h3>Service Confidence: before and after</h3><div class="small">Campaign measures before → after this mission (this mission's own result in brackets). Overall <b>${overallConfidence(out.before)}%</b> → <b>${overallConfidence(out.after)}%</b> (${confidenceWord(overallConfidence(out.after))}).</div>
+        ${this.measureBars(out.after, out.before)}<div class="small">Mission result: ${MEASURE_KEYS.map((k) => `${MEASURE_LABEL[k].name} ${out.final[k]}%`).join(' · ')}</div>
+        <h3>Evidence collected</h3>${m.evidence.length ? `<table class="t"><tr><th>Evidence</th><th>Source room</th><th>Pass</th><th>Sensitivity</th><th></th></tr>${evRows}</table>` : '<p>No evidence items on a free-roam shift.</p>'}
+        <h3>Routes and services affected by your actions</h3><ul>${affected.length ? affected.map(([id, st]) => `<li>${esc(nm(id))}: <b>${esc(st)}</b></li>`).join('') : '<li>None: no route or room was held.</li>'}${Object.keys(state.contained).length ? '<li>Containments still active: ' + Object.keys(state.contained).map((c) => esc(nm(c))).join(', ') + '</li>' : ''}</ul>
+        <h3>Safest next step</h3><p>${esc(m.nextStep(state))}</p><h3>What to take away</h3><p>${esc(deb.learn)}</p></div></div>
+      <div class="row" style="margin-top:10px"><button class="primary" data-a="${next ? 'next' : 'missions'}">${next ? `Next: ${esc(next.title)}` : 'Campaign overview'}</button><button data-a="again">Replay mission</button><button data-a="missions">Mission Select</button><button data-a="title">Title</button></div></div>`);
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
-      if (a === 'again') this.startMission(state.mission.id); if (a === 'missions') { this.leaveMissionVisuals(); this.showMissionSelect(); } if (a === 'title') this.showTitle();
+      if (a === 'again') this.startMission(m.id);
+      if (a === 'next' && next) this.startMission(next.id);
+      if (a === 'missions') { this.leaveMissionVisuals(); this.showMissionSelect(); }
+      if (a === 'title') this.showTitle();
     });
   }
 
@@ -252,7 +296,7 @@ export class UI {
   private buildHud(): void {
     const hud = el('div', { id: 'hudroot' }, `
       <div id="hud"><div class="hud-row" id="meters"></div><div class="hud-row"><div id="objective" role="status" aria-live="polite"></div>
-        <div class="hud-btns"><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
+        <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
       <div id="tooltip"></div>
       <div id="belt" role="toolbar" aria-label="Tool belt"></div>
       <div id="inspect" class="open"></div>
@@ -264,6 +308,8 @@ export class UI {
       <div id="touch"><div class="dpad"><span></span><button data-d="-1,-1" aria-label="Move up">↑</button><span></span><button data-d="-1,1" aria-label="Move left">←</button><span></span><button data-d="1,-1" aria-label="Move right">→</button><span></span><button data-d="1,1" aria-label="Move down">↓</button><span></span></div>
         <div class="act"><button class="primary" id="t-e" aria-label="Interact">E</button><button id="t-esc" aria-label="Pause">⏸</button></div></div>`);
     this.root.appendChild(hud); this.hud = hud;
+    $(hud, '#b-goals')!.onclick = () => this.state && this.openDialog({ type: 'goals' });
+    $(hud, '#b-conf')!.onclick = () => this.state && this.openDialog({ type: 'confidence' });
     $(hud, '#b-map')!.onclick = () => this.openPanel('map');
     $(hud, '#b-fabric')!.onclick = () => this.openPanel('fabric');
     $(hud, '#b-log')!.onclick = () => this.openPanel('log');
@@ -318,8 +364,9 @@ export class UI {
     const showHint = this.hintOpen;
     $(hud, '#objective')!.innerHTML = cur
       ? `<div><div class="n">Objective ${done + 1} of ${objs.length}</div><div class="t">${esc(cur.text)}</div>${showHint ? `<div class="h">→ ${esc(cur.hint)}</div>` : ''}</div><button id="b-hint">${showHint ? 'Hide hint' : 'Hint'}</button>`
-      : `<div><div class="n">All objectives done</div><div class="t">Great work.</div></div>`;
+      : `<div><div class="n">All guided steps done</div><div class="t">Great work. File the report at the Evidence Board.</div></div>`;
     $(hud, '#b-hint')?.addEventListener('click', () => { this.hintOpen = !this.hintOpen; this.renderHud(); });
+    const cb = $(hud, '#b-conf'); if (cb) cb.textContent = `\u2630 Confidence ${overallConfidence(measuresOf(st))}%`;
     const pm = $(hud, '#b-routes'); if (pm) pm.setAttribute('aria-pressed', String(this.scene?.routesVisible() ?? true));
     this.renderPasses();
   }
@@ -539,7 +586,21 @@ export class UI {
       }
       case 'alert': {
         const m = st.mission;
-        card(`<div class="chip bad">❗ ${esc(m.alert.severity)} severity alert</div><h2 style="margin-top:6px">${esc(m.alert.headline)}</h2><ul>${m.alert.symptoms.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p><b>Likely impact:</b> ${esc(m.alert.impact)}</p><p><b>Points at:</b> ${esc(ROOM_BY_ID[m.alert.points].name)} (${esc(ROOM_BY_ID[m.alert.points].code)}). You only hold an Ops Pass: request the Payments Audit Pass at the Access Desk.</p><div class="row"><button class="primary" data-a="ok">Understood</button></div>`);
+        card(`<div class="chip bad">❗ ${esc(m.alert.severity)} severity alert</div><h2 style="margin-top:6px">${esc(m.alert.headline)}</h2><ul>${m.alert.symptoms.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p><b>Likely impact:</b> ${esc(m.alert.impact)}</p><p><b>Points at:</b> ${esc(ROOM_BY_ID[m.alert.points].name)} (${esc(ROOM_BY_ID[m.alert.points].code)}). You hold an Ops Pass: request read-only passes at the Access Desk or a door reader as evidence points to each room.</p>
+          <h3>Service Confidence</h3>${this.measureBars(measuresOf(st))}<div class="row"><button class="primary" data-a="ok">Understood</button><button data-a="goals">Goals</button></div>`);
+        wrap.addEventListener('click', (e) => { if ((e.target as HTMLElement).dataset.a === 'goals') { close(); this.openDialog({ type: 'goals' }); } });
+        wrap.onclick = (e) => { if ((e.target as HTMLElement).dataset.a === 'ok') close(); };
+        break;
+      }
+      case 'confidence': {
+        const m = measuresOf(st), o = overallConfidence(m);
+        card(`<div class="chip info">Control Room wall</div><h2 style="margin-top:6px">Service Confidence: ${o}% (${confidenceWord(o)})</h2><p class="small">Five measures. A high score needs balance: shutting everything down protects integrity but costs availability; releasing everything unchecked keeps services up but costs integrity.</p>${this.measureBars(m)}<p class="small">Campaign so far: ${campaign.overall()}%.</p><div class="row"><button class="primary" data-a="ok">Close</button></div>`);
+        wrap.onclick = (e) => { if ((e.target as HTMLElement).dataset.a === 'ok') close(); };
+        break;
+      }
+      case 'goals': {
+        const m = st.mission; const kinds: ['primary' | 'optional' | 'stretch', string][] = [['primary', 'Primary (required to complete)'], ['optional', 'Optional (reward careful, skilled play; never blocks)'], ['stretch', 'Stretch (replay value)']];
+        card(`<h2>${esc(m.title)}: goals</h2>${kinds.map(([k, label]) => { const gs = m.goals.filter((g) => g.kind === k); return gs.length ? `<h3>${label}</h3><ul class="goals">${gs.map((g) => `<li>${g.done(st) ? '<span class="chip good">\u2713</span>' : '<span class="chip">\u25CB</span>'} ${esc(g.text)}</li>`).join('')}</ul>` : ''; }).join('')}<p class="small">You can recover from mistakes and still finish. Optional and stretch goals can be improved on replay.</p><div class="row"><button class="primary" data-a="ok">Close</button></div>`, 'wide');
         wrap.onclick = (e) => { if ((e.target as HTMLElement).dataset.a === 'ok') close(); };
         break;
       }
@@ -554,7 +615,7 @@ export class UI {
     const st = this.state!, runner = this.runner!;
     const rows = (ids: PassId[]) => ids.map((id) => {
       const p = PASSES[id], has = st.passes.has(id);
-      return `<tr><td><b>${esc(p.name)}</b><div class="small">${esc(ROOM_BY_ID[p.room].name)} · ${esc(p.scope)}</div></td><td>${has ? '<span class="chip good">✓ Issued</span>' : '<span class="chip warn">🔒 Not held</span>'}</td><td>${has ? '' : `<button data-req="${id}">Request</button>`}</td></tr>`;
+      return `<tr><td><b>${esc(p.name)}</b><div class="small">${esc(ROOM_BY_ID[p.room].name)} · ${esc(p.scope)}</div></td><td>${has ? '<span class="chip good">✓ Issued</span>' : '<span class="chip warn">🔒 Not held</span>'}</td><td>${has ? (id === 'ops_pass' ? '' : `<button data-rev="${id}" title="Revoke access you no longer need (least privilege)">Revoke</button>`) : `<button data-req="${id}">Request</button>`}</td></tr>`;
     }).join('');
     const ids = readerRoom ? [ROOM_BY_ID[readerRoom].requiredPass] : (Object.keys(PASSES) as PassId[]);
     const last = st.latestResult && (st.latestResult.title.includes('Pass') || st.latestResult.title.includes('Request') || st.latestResult.title.includes('granted')) ? `<div class="toast ${st.latestResult.tone}" style="margin:8px 0">${toneIcon(st.latestResult.tone)} <b>${esc(st.latestResult.title)}</b> ${esc(st.latestResult.text)}</div>` : '';
@@ -564,6 +625,7 @@ export class UI {
     wrap.onclick = (e) => {
       const b = (e.target as HTMLElement).closest('button'); if (!b) return;
       if (b.dataset.req) { runner.requestPass(b.dataset.req as PassId, readerRoom ? 'reader' : 'desk'); this.paintAccess(wrap, readerRoom, close); }
+      else if (b.dataset.rev) { runner.revoke(b.dataset.rev as PassId); this.paintAccess(wrap, readerRoom, close); }
       else if (b.dataset.a === 'ok') close();
     };
   }
@@ -578,9 +640,13 @@ export class UI {
     const ready = m.canReport(st);
     wrap.innerHTML = `<div class="card wide" role="dialog" aria-modal="true"><div class="chip info">Evidence Board</div><h2 style="margin-top:6px">Evidence path</h2><div class="path">${path}</div>
       <table class="t"><tr><th>Evidence</th><th>Room</th><th>Pass</th><th>Sensitivity</th><th>Status</th></tr>${m.evidence.map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(ROOM_BY_ID[e.sourceRoom].name)}</td><td>${esc(PASSES[e.requiredPass].name)}</td><td>${esc(e.sensitivity)}</td><td>${st.evidence.has(e.id) ? '<span class="chip good">✓ Collected</span>' : '<span class="chip">○ Missing</span>'}</td></tr>`).join('')}</table>
+      ${(m.recordables ?? []).length ? `<h3>Record results (audit quality)</h3><ul class="goals">${(m.recordables ?? []).map((r) => `<li>${st.recordsMade.includes(r.id) ? '<span class="chip good">\u2713 Recorded</span>' : r.when(st) ? `<button data-rec="${r.id}">Record</button>` : '<span class="chip">\u25CB Not ready</span>'} ${esc(r.label)}</li>`).join('')}</ul>` : ''}
+      ${(st.data.priorCount ?? 0) > 0 ? `<p class="small">Evidence from earlier missions on this board: ${st.data.priorCount} item(s).</p>` : ''}
       <p class="small">${ready === true ? 'Everything needed is in place. Filing closes the incident.' : esc(ready)}</p>
       <div class="row"><button class="primary" data-a="file" ${ready === true ? '' : 'aria-disabled="true"'}>File incident report</button><button data-a="ok">Close</button></div></div>`;
     wrap.onclick = (e) => {
+      const rec = (e.target as HTMLElement).dataset.rec;
+      if (rec) { runner.record(rec); this.paintBoard(wrap, close); return; }
       const a = (e.target as HTMLElement).dataset.a;
       if (a === 'ok') close();
       if (a === 'file') { if (ready === true) close(() => runner.fileReport()); else runner.api.say('Report not ready', String(ready), 'warn', { hint: true }); }

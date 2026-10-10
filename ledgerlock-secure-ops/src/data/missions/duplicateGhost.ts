@@ -1,4 +1,5 @@
 import type { MissionApi, MissionDef, Rule } from './types';
+import { goal } from './scenario';
 import { ROOM_BY_ID } from '../map';
 import { propTarget, routeTarget, roomTarget } from '../targets';
 import { EVIDENCE } from '../evidence';
@@ -62,7 +63,7 @@ const rules: Rule[] = [
     run: (a) => {
       const s = a.s, live = ghostIds(s).length;
       if (s.flags.released && s.flags.patched && s.flags.purged) {
-        a.flag('flowVerified'); a.status(FEED, 'fixed'); a.routeMark('receipt_event_feed', 'restored');
+        a.flag('flowVerified'); a.adjust('recovery', 4); a.status(FEED, 'fixed'); a.routeMark('receipt_event_feed', 'restored');
         a.say('Verified: receipts flowing, no duplicates', `Valid receipts are flowing again (${Math.round(a.data.validPosted)} posted). 0 replays on the feed and 0 duplicates in the ledger.`, 'good');
         a.fx('sparkle', FEED);
       } else if (s.contained[FEED]) {
@@ -111,7 +112,7 @@ const rules: Rule[] = [
     }),
     run: (a) => {
       for (const id of ghostIds(a.s)) a.removeEntity(id);
-      a.flag('purged'); a.status(REPLAY_BUFFER, 'fixed'); a.data.replaysInStream = 0;
+      a.flag('purged'); a.status(REPLAY_BUFFER, 'fixed'); a.data.replaysInStream = 0; a.adjust('recovery', 14);
       a.fx('sparkle', REPLAY_BUFFER);
       a.say('Buffer restored', 'Held duplicates were removed. Valid receipts were replayed from the journal and are ready to be released.', 'good');
     } },
@@ -131,7 +132,7 @@ const rules: Rule[] = [
       }
       const after: [string, string][] = [['Expected receipts', `${EXPECTED} · ${money(5412.6)}`], ['Received events', `${EXPECTED} (no replays)`], ['Ledger postings', `${EXPECTED} · ${money(5412.6)}`]];
       a.dialog({ type: 'info', title: 'Reconciliation: duplicate resolved, valid receipts continue', body: d.dupReversed ? `Reversal journal RJ-0042 removed ${d.dupReversed} duplicate posting(s). Valid receipts are still being posted.` : 'No duplicate receipt reached the ledger. Valid receipts continue.', compare: { before, after } });
-      a.flag('reconciled'); a.fx('sparkle', GL); a.score('Reconciled: totals agree', 'good');
+      a.flag('reconciled'); a.flag('reconciledAll'); a.adjust('recovery', 6); a.adjust('audit', 4); a.fx('sparkle', GL); a.score('Reconciled: totals agree', 'good');
     } },
   { tool: 'token', target: NOTIFIER,
     run: (a) => {
@@ -142,8 +143,27 @@ const rules: Rule[] = [
 
 const mission: MissionDef = {
   id: 'duplicate-ghost', title: 'The Duplicate Ghost', tagline: 'A card receipt keeps coming back. Find out why, without breaking the ledger.',
-  status: 'playable', difficulty: 'Tutorial', startRoom: 'secure_ops',
+  status: 'playable', difficulty: 'Tutorial', startRoom: 'secure_ops', order: 1,
+  theme: 'Transaction integrity: catch a duplicate before it posts twice.',
+  requiredPasses: ['payments_audit_pass', 'event_trace_pass', 'ledger_read_pass', 'fabric_observer_pass'],
   startClock: 15 * 60, deadlineClock: 16 * 60, deadlineLabel: 'Payment run 16:00', parSeconds: 420,
+
+  goals: [
+    goal('p1', 'primary', 'Find the repeated card receipt', (s) => !!s.flags.scannedTerminal && !!s.flags.receiptEvidence, 'Signal Scanner (1) at the Card Terminal, then the Masked Receipt Log.'),
+    goal('p2', 'primary', 'Trace it from Card Payments through the Event Stream Hall', (s) => !!s.flags.lensed && !!s.flags.traceEvidence, 'Forensic Lens (2) on the Receipt Event Feed, then the replay trace in the Event Stream Hall.'),
+    goal('p3', 'primary', 'Contain only the replaying route', (s) => !!s.flags.contained, 'Quarantine Field (3) on the Receipt Event Feed.'),
+    goal('p4', 'primary', 'Apply the simulated fix', (s) => !!s.flags.patched && !!s.flags.purged, 'Patch Kit (4) at the Settlement Notifier and Clean Restore (6) at the Replay Buffer.'),
+    goal('p5', 'primary', 'Reconcile Finance Core totals', (s) => !!s.flags.reconciled, 'Reconciliation Wand (7) at Accounts Receivable.'),
+    goal('p6', 'primary', 'Verify Fabric data freshness', (s) => !!s.flags.fabricVerified, 'Fabric Observer Pass, then E at the Pipeline Status Display.'),
+    goal('o1', 'optional', 'Keep other card receipts moving', (s) => !!s.flags.rerouted || !s.flags.contained),
+    goal('o2', 'optional', 'Obtain only the required access passes', (s) => [...s.passes].filter((p) => p !== 'ops_pass').every((p) => (s.mission.requiredPasses ?? []).includes(p)) && s.stats.passDenials === 0),
+    goal('o3', 'optional', 'Collect all three evidence items', (s) => ['ev_masked_receipt', 'ev_replay_trace', 'ev_ledger_check'].every((e) => s.evidence.has(e))),
+    goal('o4', 'optional', 'Record the final reconciliation result', (s) => !!s.flags.rec_recon_result),
+    goal('s1', 'stretch', 'No duplicate ever reaches the ledger', (s) => !!s.flags.reconciled && (s.data.dupReversed ?? 0) === 0 && (s.data.dupPosted ?? 0) === 0),
+    goal('s2', 'stretch', 'Finish in under 7 minutes with no hints', (s) => !!s.flags.reconciled && s.elapsed < 420 && s.stats.hintsUsed === 0),
+  ],
+  recordables: [{ id: 'recon_result', label: 'Final reconciliation: 128 expected / 128 received / 128 posted', when: (s) => !!s.flags.reconciled }],
+  nextStep: () => 'Require an idempotency key on every receipt event, and keep the replay path quarantine runbook next to the Settlement Notifier.',
   alert: { severity: 'Medium', headline: 'Receipt count mismatch: card receipt R-77•• seen more than once', points: 'card_payments',
     symptoms: ['Receipt count mismatch between Card Payments and the event stream', 'Accounts Receivable has not flagged a variance yet', 'Valid card receipts are still arriving'],
     impact: 'If duplicates reach the General Ledger, the same card receipt posts twice and transaction integrity falls.' },
@@ -232,7 +252,7 @@ const mission: MissionDef = {
         return a.say('Reporting not ready to verify', 'Release the containment, verify the feed with the Signal Scanner, and reconcile first. The panel shows demo data meanwhile.', 'info', { hint: true });
       }
       if (!a.evidence('ev_fabric_freshness')) return;
-      a.flag('fabricVerified'); a.fx('sparkle', PIPELINE); a.score('Verified in Fabric', 'good');
+      a.flag('fabricVerified'); a.adjust('audit', 6); a.fx('sparkle', PIPELINE); a.score('Verified in Fabric', 'good');
       s.emit('ui', 'fabric');
       a.say('Verified in Fabric (demo data)', 'Bronze, Silver and Gold agree on 128 receipts. Freshness is back to normal and the dashboard is healthy.', 'good');
     },

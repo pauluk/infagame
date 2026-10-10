@@ -13,11 +13,11 @@ A lightly humorous, single-player **isometric security-operations game** set in 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # type-check not included; see npm run typecheck
+npm run build      # tsc --noEmit + vite build
 npm run preview    # serve the production build on http://localhost:4173
-npm run test       # 21 logic tests (map, passes, routes, mission rules, scoring, Fabric demo adapter)
+npm run test       # 38 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
 npm run typecheck  # tsc --noEmit
-npm run test:e2e   # real-browser playthrough of the tutorial (needs `npm run preview` running and Playwright, see below)
+npm run test:e2e   # real-browser playthrough of the tutorial (needs `npm run preview` running and Playwright); also tests/e2e-campaign.mjs
 npm run assets:render   # OPTIONAL: re-render all sprites with Blender (see docs/art-pipeline.md)
 ```
 
@@ -28,7 +28,7 @@ Requires Node 20+ (developed on Node 22). `npm run assets:render` additionally n
 1. **Start Shift** (title) -> read the briefing. You begin in **Secure Ops Control (A3)** holding only an `ops_pass`.
 2. Doors are locked until you hold the room's **read-only, mission-scoped pass**. Request passes at the **Access Desk** or at any **door reader** (press <kbd>E</kbd> next to it). Requests are approved only when evidence justifies them; otherwise you get a clear denial and a hint. There is no bypass.
 3. Walk the corridors, scan, retrieve masked evidence, trace the event order, **contain only what you must**, patch, restore, reconcile, then verify (including in the Fabric room) and file the report on the **Evidence Board** back in Secure Ops Control.
-4. The debrief scores you out of 100 (35 integrity, 25 availability, 20 diagnosis and verification, 10 privacy and containment, 10 time). A safe, verified result is always a positive result, and a broad shutdown is recoverable.
+4. The debrief scores you out of 100 (35 integrity, 25 availability, 20 diagnosis and verification, 10 privacy and containment, 10 time) and shows the campaign Service Confidence before and after. A safe, verified result is always a positive result, and a broad shutdown is recoverable.
 
 ### Controls
 
@@ -45,12 +45,15 @@ Requires Node 20+ (developed on Node 22). `npm run assets:render` additionally n
 
 Accessibility: mute, **reduced motion** (no pulses/shakes/bobbing; route direction stays visible via arrows), relaxed pace (half-speed incidents), larger text. Status is never colour-only: every state has a label, icon or shape.
 
-## Missions
+## Campaign and missions
 
-* **The Duplicate Ghost** (tutorial, ~5 min): a card receipt event is replayed and may post twice. Full bespoke simulation: passes, evidence, replays travelling the *Receipt Event Feed*, impact previews, narrow vs broad containment, patch, buffer restore, before/after reconciliation, Fabric verification, scoring.
-* **BACS After Dark**, **The Collection Connection**, **Event Stream Tide**, **The Fabric Mirror**: playable *simplified* scenarios on the same engine (`src/data/missions/scenario.ts`, data in `followOns.ts`): objective, clues, response choices (narrow vs broad vs unsafe), success condition and debrief each. They are intentionally shorter than the tutorial.
+**Campaign goal:** protect the fictional finance service while keeping valid payments, debt receipts and reporting accurate and available. Progress is measured by safe outcomes and clear evidence (see `docs/campaign.md`).
 
-Add a mission by writing a `MissionDef` (`src/data/missions/types.ts`) and listing it in `src/data/missions/index.ts`. Game state (`GameState`) and rules (`MissionRunner`) are free of Phaser/DOM code.
+* Eight missions: **The Duplicate Ghost** (tutorial), **BACS After Dark**, **The Collection Connection**, **Event Stream Tide**, **The Fabric Mirror**, **Token on the Table**, **The Clean Restore** and the finale **The Root of the Ripple**, plus the free-roam **Operations Floor** with six optional side tasks.
+* Every mission has primary, optional and stretch objectives; optional objectives never block progress and mistakes are recoverable.
+* Five campaign measures (transaction integrity, service availability, data protection, recovery readiness, audit quality) combine into **Service Confidence**, shown on the Control Room wall and in every debrief. Six badges reward good habits (Precision Over Panic, Least Privilege, No Lost Events, Ledger Listener, Clean Restore, Good Evidence).
+* Debriefs show objective status, evidence and its sources, Service Confidence before/after, routes affected and the safest next step. Completed missions can be replayed. Progress lives only in your browser's local storage.
+* The tutorial has a bespoke simulation; missions 2-8 run on the declarative scenario engine (`src/data/missions/scenario.ts`). Add a mission by writing a `MissionDef` / `ScenarioSpec` and listing it in `src/data/missions/index.ts`. Game state (`GameState`) and rules (`MissionRunner`) contain no Phaser/DOM code.
 
 ## Facility map
 

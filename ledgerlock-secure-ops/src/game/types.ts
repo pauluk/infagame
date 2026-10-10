@@ -10,7 +10,8 @@ export type ExternalId = 'bank_sim' | 'card_network_sim' | 'agency_sim' | 'repor
 export type PassId =
   | 'ops_pass' | 'service_audit_pass' | 'api_audit_pass' | 'payments_audit_pass' | 'event_trace_pass'
   | 'ledger_read_pass' | 'payment_ops_pass' | 'bacs_audit_pass' | 'debt_read_pass'
-  | 'agency_audit_pass' | 'fabric_observer_pass' | 'integration_audit_pass';
+  | 'agency_audit_pass' | 'fabric_observer_pass' | 'integration_audit_pass'
+  | 'token_rotation_pass';        // special: time-limited rotation approval (opens no door)
 
 export type Side = 'n' | 'e' | 's' | 'w';
 export interface Cell { x: number; y: number }
@@ -96,7 +97,9 @@ export type DialogSpec =
   | { type: 'info'; title: string; body: string; rows?: [string, string][]; compare?: { before: [string, string][]; after: [string, string][] } }
   | { type: 'alert' }
   | { type: 'access'; readerRoom?: RoomId }
-  | { type: 'board' };
+  | { type: 'board' }
+  | { type: 'confidence' }
+  | { type: 'goals' };
 
 export interface ResultCard { title: string; text: string; tone: Tone; hint?: boolean }
 

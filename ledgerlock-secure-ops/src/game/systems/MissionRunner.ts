@@ -51,6 +51,7 @@ export class MissionRunner {
         }
         if (!s.evidence.has(id)) {
           s.evidence.add(id);
+          s.adjust('audit', 8);
           s.log(`Evidence retrieved: ${ev.name} (${ev.sensitivity})`, 'clue');
           s.score(`Evidence: ${ev.name}`, 'good');
           s.changed();
@@ -60,9 +61,13 @@ export class MissionRunner {
       status: (t, st) => s.setStatus(t, st),
       adjust: (metric, d, why) => {
         s.adjust(metric, d);
-        if (why) s.log(`${metric === 'integrity' ? 'Transaction integrity' : 'Data protection'} ${d > 0 ? '+' : ''}${d}%: ${why}`, d < 0 ? 'warn' : 'good');
+        const name = { integrity: 'Transaction integrity', protection: 'Data protection', recovery: 'Recovery readiness', audit: 'Audit quality' }[metric];
+        if (why) s.log(`${name} ${d > 0 ? '+' : ''}${d}%: ${why}`, d < 0 ? 'warn' : 'good');
       },
+      grantPass(pass, why) { runner.grant(pass, why); },
+      revokePass(pass) { runner.revoke(pass); },
       hit(key, availability, seconds) { s.hits[key] = { availability, until: seconds ? s.elapsed + seconds : undefined }; s.changed(); },
+      clearHit(key) { delete s.hits[key]; s.changed(); },
       entity: (id, patch) => s.setEntity(id, patch),
       removeEntity: (id) => s.removeEntity(id),
       fx: (type, target) => s.emit('fx', { type, target }),
@@ -84,6 +89,7 @@ export class MissionRunner {
     const dt = dtReal * this.timeScale;
     s.elapsed += dt;
     for (const [k, h] of Object.entries(s.hits)) if (h.until && s.elapsed >= h.until) delete s.hits[k];
+    for (const [p, until] of Object.entries(s.passExpiry)) if (s.elapsed >= until) { delete s.passExpiry[p]; s.passes.delete(p as PassId); s.flags['expired_' + p] = true; s.log(`${PASSES[p as PassId].name} expired (time-limited).`, 'info'); s.emit('pass', { pass: p as PassId, granted: false }); }
     this.m.tick?.(this.api, dt);
     this.recompute();
     s.stats.availSum += s.availability * dt;
@@ -112,6 +118,8 @@ export class MissionRunner {
       else if (routeRooms(r).some((room) => containedRooms.includes(room))) s.routeStates[r.id] = 'delayed';
       else s.routeStates[r.id] = s.routeMarks[r.id] ?? 'healthy';
     }
+    for (const r of ROUTES) { const st = s.routeStates[r.id]; if (st !== 'healthy' && st !== 'restored') s.affected['route:' + r.id] = st; }
+    for (const t of Object.keys(s.contained)) s.affected[t] = s.affected[t] ?? 'quarantined';
     s.incidents = this.m.incidents(s);
     s.changed();
   }
@@ -130,20 +138,48 @@ export class MissionRunner {
     if (s.passes.has(pass)) return a.say('Pass already issued', `${def.name}: ${def.scope}.`, 'info');
     const grant = this.m.passGrants[pass];
     if (grant && grant.when(s)) {
-      s.passes.add(pass);
-      s.emit('pass', { pass, granted: true });
-      a.fx('pass', `room:${def.room}`);
-      s.log(`Pass granted (${via === 'desk' ? 'Access Desk' : 'door reader'}): ${def.name}. Read-only, mission-scoped, expires at debrief.`, 'good');
-      s.score(`Pass: ${def.name}`, 'good');
-      a.say('Pass granted', `${def.name}: ${def.scope}. It expires when this mission ends.`, 'good');
+      this.grant(pass, via === 'desk' ? 'Access Desk' : 'door reader');
+      a.say('Pass granted', `${def.name}: ${def.scope}. It expires when this mission ends${def.minutes ? ` (or in ${def.minutes} game minutes)` : ''}.`, 'good');
     } else {
-      s.stats.passDenials++;
+      s.stats.passDenials++; s.adjust('audit', -3);
       s.emit('pass', { pass, granted: false });
       const hint = grant?.hint ?? `No current evidence points at ${ROOM_BY_ID[def.room].name}. Request this pass when a clue does. ${def.hint}`;
       s.log(`Pass request denied: ${def.name}.`, 'warn');
       a.say('Request denied', hint, 'warn', { hint: true });
     }
     s.changed();
+  }
+
+  /** Issue a pass (read-only, mission-scoped). Passes the mission does not need cost Data protection (least privilege). */
+  grant(pass: PassId, via = 'approval'): void {
+    const s = this.s, def = PASSES[pass];
+    s.passes.add(pass); s.flags['granted_' + pass] = true;
+    if (def.minutes) s.passExpiry[pass] = s.elapsed + def.minutes * 8;      // 8 s of real time per game minute
+    s.emit('pass', { pass, granted: true });
+    this.api.fx('pass', `room:${def.room}`);
+    s.log(`Pass granted (${via}): ${def.name}. Read-only, mission-scoped, expires at debrief.`, 'good');
+    s.score(`Pass: ${def.name}`, 'good');
+    const need = this.m.requiredPasses;
+    if (need && !need.includes(pass) && pass !== 'ops_pass') { s.adjust('protection', -8); s.log('Data protection \u22128%: that pass was broader access than the incident needed.', 'warn'); }
+    s.changed();
+  }
+  revoke(pass: PassId): void {
+    const s = this.s;
+    if (pass === 'ops_pass' || !s.passes.has(pass)) return;
+    s.passes.delete(pass); delete s.passExpiry[pass]; s.revoked.push(pass);
+    s.adjust('protection', 4); s.adjust('audit', 3);
+    s.log(`Pass revoked: ${PASSES[pass].name}. Least privilege restored.`, 'good');
+    s.emit('pass', { pass, granted: false });
+    this.m.onRevoke?.(this.api, pass);
+    s.changed();
+  }
+
+  /** Evidence Board: record a result (audit quality). */
+  record(id: string): void {
+    const s = this.s, r = this.m.recordables?.find((x) => x.id === id);
+    if (!r || !r.when(s) || s.recordsMade.includes(id)) return;
+    s.recordsMade.push(id); s.flags['rec_' + id] = true; s.data['rec_' + id + '_at'] = s.elapsed; s.adjust('audit', 6);
+    this.api.say('Result recorded', `${r.label}: recorded on the Evidence Board with source and outcome.`, 'good');
   }
 
   // ---------- interaction ----------
@@ -158,10 +194,10 @@ export class MissionRunner {
     if (tool.id === 'reroute') return this.reroute(t);
     const rule = this.m.rules.find((r) => r.tool === tool.id && matches(r.target, targetId));
     if (rule) {
-      const block = rule.requires?.(s);
+      const block = rule.requires?.(s, targetId);
       if (typeof block === 'string') return a.say('Not just yet', block, 'warn', { hint: true });
       const go = () => { rule.run(a, t); this.checkComplete(); };
-      const conf = rule.confirm?.(s);
+      const conf = rule.confirm?.(s, targetId);
       if (conf) a.dialog({ type: 'confirm', title: conf.title, body: conf.body, why: tool.why, impacts: conf.impacts, confirmLabel: conf.confirmLabel ?? 'Go ahead', onConfirm: go });
       else go();
       return;
@@ -206,7 +242,7 @@ export class MissionRunner {
       case 'token':
         a.unnecessary(); a.hit('token:' + t.id, 4, 20);
         return a.say('Credential rotated', `A simulated credential near ${t.name} was refreshed. No exposure was suspected, so this briefly interrupted a service for no gain.`, 'warn');
-      case 'restore': return a.say('No restore needed', `${t.name} has no known-bad state. A restore here would only add risk.`, 'info');
+      case 'restore': a.unnecessary(); s.flags.unrelatedRestore = true; s.adjust('recovery', -6); return a.say('No restore needed', `${t.name} has no known-bad state. Restoring unrelated systems only adds risk.`, 'warn');
       case 'recon': return a.say('Totals agree', `Expected and received totals match for ${t.name}. (Simulated check.)`, 'good');
       default: return a.say('No effect', 'That tool does nothing here.', 'info');
     }
@@ -214,7 +250,7 @@ export class MissionRunner {
 
   private quarantine(t: TargetInfo): void {
     const a = this.api, s = this.s;
-    if (t.kind !== 'room' && t.kind !== 'route') return a.say('Pick a room or route', 'Quarantine Field works on a room or a route. Click a flow line or the room floor to select it.', 'info', { hint: true });
+    if (t.kind !== 'room' && t.kind !== 'route' && !(t.kind === 'prop' && this.m.containment[t.id])) return a.say('Pick a room or route', 'Quarantine Field works on a room, a route or a flagged component. Click a flow line or the room floor to select it.', 'info', { hint: true });
     const cfg = this.containmentFor(t.id);
     if (s.contained[t.id]) {
       const block = cfg.canRelease?.(s);
@@ -233,6 +269,7 @@ export class MissionRunner {
       onConfirm: () => {
         if ((cfg as { unneeded?: boolean }).unneeded) a.unnecessary();
         a.contain(t.id); cfg.onApply?.(a);
+        (s.data.containments ??= []).push({ target: t.id, narrow: cfg.narrow });
         s.score(`Contained ${t.name}`, cfg.effective ? 'good' : 'warn');
         a.say('Containment active', `${t.name} is contained.${cfg.applyText ? ' ' + cfg.applyText : ''}`, cfg.effective ? 'good' : 'warn');
         this.checkComplete();
@@ -262,7 +299,7 @@ export class MissionRunner {
     const s = this.s;
     const ok = this.m.canReport(s);
     if (ok !== true) { this.api.say('Report not ready', ok, 'warn', { hint: true }); return; }
-    s.setFlag('reported'); this.checkComplete();
+    s.adjust('audit', 10); s.setFlag('reported'); this.checkComplete();
   }
 
   /** Called by the scene whenever the player's room changes. */

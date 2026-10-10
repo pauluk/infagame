@@ -1,101 +1,172 @@
-import type { ContainmentCfg, MissionDef, Rule } from './types';
+import type { ContainmentCfg, Debrief, GoalDef, MissionApi, MissionDef, Recordable, Rule, ScoreInput } from './types';
 import type { GameState } from '../../game/systems/GameState';
-import type { EvidenceDef, PassId, RoomId, Tone } from '../../game/types';
+import type { EvidenceDef, PassId, RoomId, ToolId, Tone } from '../../game/types';
 import { PASSES } from '../passes';
-import { propTarget, routeTarget } from '../targets';
-import { ROOM_BY_ID } from '../map';
+import { propTarget } from '../targets';
+
+type Gain = Partial<Record<'integrity' | 'protection' | 'recovery' | 'audit', number>>;
+export interface Info { title: string; rows?: [string, string][]; body: string; compare?: { before: [string, string][]; after: [string, string][] } }
+export interface ChoiceOption {
+  id: string; label: string; detail: string; correct: boolean;
+  /** Completes the step even though it is not the best choice (e.g. a broad but safe response). Default: same as `correct`. */
+  completes?: boolean;
+  result: string; gain?: Gain; hit?: number; hitSeconds?: number; flags?: string[];
+}
+export interface StepSpec {
+  id: string; at: string | string[]; tool: ToolId | 'e';
+  needs?: string[]; needsMsg?: string; needsPass?: PassId;
+  evidence?: string;
+  info?: Info | ((a: MissionApi) => Info);
+  choice?: { title: string; body: string | ((a: MissionApi) => string); options: ChoiceOption[] };
+  confirm?: { title: string; body: string; impacts: { label: string; text: string; tone: Tone }[]; confirmLabel?: string };
+  say?: [string, string, Tone];
+  fx?: 'scan' | 'sparkle' | 'repair';
+  gain?: Gain;
+  status?: [string, 'suspect' | 'bad' | 'ok' | 'fixed' | undefined][];
+  mark?: [string, 'suspicious' | 'restored' | undefined][];
+  effect?: (a: MissionApi) => void;
+}
+export type ScriptAction = ['pass', PassId] | ['step', string] | ['contain', string] | ['release', string] | ['wait', number] | ['record', string] | ['report'];
+export interface ContainSpec { id: string; target: string; cfg: Omit<ContainmentCfg, 'onApply' | 'onRelease'>; releaseId?: string; canRelease?: (s: GameState) => true | string; scope: string }
 
 export interface ScenarioSpec {
-  id: string; title: string; tagline: string; difficulty: string;
-  pointsRoom: RoomId; route: string;
+  id: string; title: string; tagline: string; difficulty: string; order: number; theme: string;
+  pointsRoom: RoomId; incidentRoute: string;
   clock: [start: string, deadline: string, label: string]; parSeconds: number;
   alert: { severity: string; headline: string; symptoms: string[]; impact: string };
   briefing: string[];
-  /** The two rooms visited, their passes, the prop that carries each piece of evidence, and the scan target in room 1. */
-  r1: { room: RoomId; pass: PassId; scan: string; scanText: string; evidenceProp: string; evidence: Omit<EvidenceDef, 'sourceRoom' | 'requiredPass'>; evidenceRows: [string, string][]; evidenceBody: string };
-  r2: { room: RoomId; pass: PassId; evidenceProp: string; evidence: Omit<EvidenceDef, 'sourceRoom' | 'requiredPass'>; evidenceRows: [string, string][]; evidenceBody: string };
-  lens: { steps: { time: string; text: string; tone: Tone }[]; conclusion: string };
-  responseProp: string;
-  responses: { id: string; label: string; detail: string; narrow: number; correct: boolean; result: string; availabilityHit?: number; hitSeconds?: number; integrity?: number; protection?: number }[];
-  freshnessEffect?: 'mirrorStuck' | 'silverLag';
-  outline: NonNullable<MissionDef['outline']>;
-  debrief: { what: string; learn: string };
+  evidence: EvidenceDef[]; evidencePath: RoomId[];
+  passes: { pass: PassId; when: (s: GameState) => boolean; hint: string }[];
+  required?: PassId[];
+  steps: StepSpec[];
+  contain?: ContainSpec[];
+  goals: GoalDef[];
+  recordables?: Recordable[];
+  setup?: (a: MissionApi) => void;
+  tick?: (a: MissionApi, dt: number) => void;
+  interactions?: MissionDef['interactions'];
+  onRevoke?: MissionDef['onRevoke'];
+  incidents?: (s: GameState) => number;
+  narrow?: (s: GameState) => number;
+  debrief: { what: string; learn: string; response?: (s: GameState) => string[]; nextStep: (s: GameState) => string };
+  script: ScriptAction[];
 }
 
 const mins = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const matches = (spec: string | string[], id: string) => (Array.isArray(spec) ? spec.includes(id) : spec === id);
+export const st = (id: string) => (s: GameState) => !!s.flags['st_' + id];
+export const goal = (id: string, kind: GoalDef['kind'], text: string, done: GoalDef['done'], hint?: string): GoalDef => ({ id, kind, text, done, hint });
 
-/** Builds a playable, simplified scenario on the same engine as the tutorial: passes, evidence, lens, response choice, verification, report. */
+/** Builds a playable mission from declarative steps on the same engine as the tutorial. */
 export function makeScenario(sp: ScenarioSpec): MissionDef {
-  const feed = routeTarget(sp.route);
-  const ev1 = { ...sp.r1.evidence, sourceRoom: sp.r1.room, requiredPass: sp.r1.pass } as EvidenceDef;
-  const ev2 = { ...sp.r2.evidence, sourceRoom: sp.r2.room, requiredPass: sp.r2.pass } as EvidenceDef;
-  const rules: Rule[] = [
-    { tool: 'scanner', target: sp.r1.scan, run: (a) => { a.flag('scanned'); a.status(sp.r1.scan, 'suspect'); a.routeMark(sp.route, 'suspicious'); a.clue('c_scan', 'Component flagged', sp.r1.scanText); a.say('Component flagged', sp.r1.scanText, 'warn'); a.fx('scan', sp.r1.scan); } },
-    { tool: 'lens', target: feed,
-      requires: (s) => (!s.evidence.has(ev1.id) ? 'Retrieve the first piece of evidence in this room so the lens has something to follow.' : true),
-      run: (a) => { a.flag('lensed'); a.clue('c_lens', 'Event order revealed', sp.lens.conclusion); a.dialog({ type: 'timeline', title: 'Forensic Lens: event order', steps: sp.lens.steps, conclusion: sp.lens.conclusion }); } },
-    { tool: 'scanner', target: feed,
-      run: (a) => {
-        if (a.s.flags.fixed) { a.flag('verified'); a.routeMark(sp.route, 'restored'); a.status(feed, 'fixed'); a.say('Verified', 'The route is healthy: totals match and the fix is holding.', 'good'); a.fx('sparkle', feed); }
-        else a.say('Route needs attention', 'The fault is still present. Choose a response first.', 'warn');
-      } },
-  ];
-  const containment: Record<string, ContainmentCfg> = {
-    [feed]: { availability: 3, narrow: 1, effective: true, notes: [{ label: 'Holds', text: 'Only this route pauses. Other routes keep running.', tone: 'good' }], onApply: (a) => { a.data.scope ??= 'narrow'; } },
+  const done = (s: GameState, id: string) => !!s.flags['st_' + id];
+  const stepsFor = (target: string, tool: ToolId | 'e') => sp.steps.filter((x) => x.tool === tool && matches(x.at, target));
+
+  function complete(a: MissionApi, step: StepSpec, target: string): void {
+    if (step.evidence && !a.evidence(step.evidence)) return;
+    a.flag('st_' + step.id);
+    if (step.gain) for (const [k, v] of Object.entries(step.gain)) a.adjust(k as keyof Gain, v as number);
+    for (const [t, st2] of step.status ?? []) a.status(t, st2);
+    for (const [r, m] of step.mark ?? []) a.routeMark(r, m);
+    step.effect?.(a);
+    if (step.fx) a.fx(step.fx, target);
+    if (step.say) a.say(step.say[0], step.say[1], step.say[2]);
+  }
+  function perform(a: MissionApi, step: StepSpec, target: string): void {
+    if (step.evidence) {
+      const ev = sp.evidence.find((e) => e.id === step.evidence);
+      if (ev && !a.s.passes.has(ev.requiredPass)) { a.say('Access denied', `${ev.name} needs the ${PASSES[ev.requiredPass].name}.`, 'warn', { hint: true }); return; }
+    }
+    const info = typeof step.info === 'function' ? step.info(a) : step.info;
+    if (step.choice) {
+      const c = step.choice;
+      a.dialog({
+        type: 'choice', title: c.title, body: typeof c.body === 'function' ? c.body(a) : c.body,
+        options: c.options.map((o) => ({ id: o.id, label: o.label, detail: o.detail })),
+        onChoose: (id) => {
+          const o = c.options.find((x) => x.id === id)!;
+          if (o.gain) for (const [k, v] of Object.entries(o.gain)) a.adjust(k as keyof Gain, v as number, o.correct ? undefined : o.label);
+          if (o.hit) a.hit('opt:' + step.id + id, o.hit, o.hitSeconds ?? 45);
+          for (const f of o.flags ?? []) a.flag(f);
+          if (o.completes ?? o.correct) { complete(a, step, target); a.say(o.correct ? 'Good call' : 'Done, with a cost', o.result, o.correct ? 'good' : 'warn'); }
+          else { a.data.wrong = (a.data.wrong ?? 0) + 1; a.say('That works against you', o.result + ' You can try again.', 'warn', { hint: true }); }
+        },
+      });
+      return;
+    }
+    if (info) a.dialog({ type: 'info', ...info });
+    complete(a, step, target);
+  }
+  function dispatch(a: MissionApi, target: string, tool: ToolId | 'e'): void {
+    const cands = stepsFor(target, tool);
+    if (!cands.length) return;
+    const okNeeds = (x: StepSpec) => (x.needs ?? []).every((n) => done(a.s, n)) && (!x.needsPass || a.s.passes.has(x.needsPass));
+    const pick = cands.find((x) => !done(a.s, x.id) && okNeeds(x));
+    if (!pick) {
+      const blocked = cands.find((x) => !done(a.s, x.id));
+      if (blocked) return a.say('Not just yet', blocked.needsMsg ?? 'Another step needs to happen first.', 'warn', { hint: true });
+      if (target.endsWith('incident_wall')) return a.dialog({ type: 'alert' });
+      if (target.endsWith('evidence_board')) return a.dialog({ type: 'board' });
+      const last = cands[cands.length - 1], info = typeof last.info === 'function' ? last.info(a) : last.info;
+      if (info) return a.dialog({ type: 'info', ...info });
+      return a.say('Already done', 'This step is complete.', 'info');
+    }
+    if (pick.confirm) {
+      const c = pick.confirm, tool2 = pick.tool;
+      a.dialog({ type: 'confirm', title: c.title, body: c.body, why: tool2 === 'e' ? undefined : undefined, impacts: c.impacts, confirmLabel: c.confirmLabel ?? 'Go ahead', onConfirm: () => perform(a, pick, target) });
+      return;
+    }
+    perform(a, pick, target);
+  }
+
+  const toolTargets = new Map<ToolId, Set<string>>();
+  for (const x of sp.steps) if (x.tool !== 'e') { const set = toolTargets.get(x.tool) ?? new Set(); (Array.isArray(x.at) ? x.at : [x.at]).forEach((t) => set.add(t)); toolTargets.set(x.tool, set); }
+  const rules: Rule[] = [...toolTargets.entries()].map(([tool, set]) => ({ tool, target: (id: string) => set.has(id), run: (a, t) => dispatch(a, t.id, tool) }));
+
+  const interactions: NonNullable<MissionDef['interactions']> = {
+    [propTarget('secure_ops', 'incident_wall')]: (a) => { a.flag('briefed'); a.dialog({ type: 'alert' }); },
+    ...(sp.interactions ?? {}),
   };
+  for (const x of sp.steps) if (x.tool === 'e') for (const t of Array.isArray(x.at) ? x.at : [x.at]) if (!interactions[t] || sp.interactions?.[t] === undefined) interactions[t] = (a, tt) => dispatch(a, tt.id, 'e');
+
+  const containment: Record<string, ContainmentCfg> = {};
+  for (const c of sp.contain ?? []) {
+    containment[c.target] = {
+      ...c.cfg,
+      onApply: (a) => { a.data.scope ??= c.scope; a.flag('st_' + c.id); },
+      onRelease: (a) => { if (c.releaseId) { a.flag('st_' + c.releaseId); } },
+      canRelease: c.canRelease,
+    };
+  }
+
+  const primary = sp.goals.filter((g) => g.kind === 'primary');
   const mission: MissionDef = {
-    id: sp.id, title: sp.title, tagline: sp.tagline, status: 'playable', difficulty: sp.difficulty, startRoom: 'secure_ops',
-    startClock: mins(sp.clock[0]), deadlineClock: mins(sp.clock[1]), deadlineLabel: sp.clock[2], parSeconds: sp.parSeconds,
+    id: sp.id, title: sp.title, tagline: sp.tagline, status: 'playable', difficulty: sp.difficulty, order: sp.order, theme: sp.theme,
+    startRoom: 'secure_ops', startClock: mins(sp.clock[0]), deadlineClock: mins(sp.clock[1]), deadlineLabel: sp.clock[2], parSeconds: sp.parSeconds,
     alert: { ...sp.alert, points: sp.pointsRoom }, briefing: sp.briefing,
-    evidencePath: [sp.r1.room, sp.r2.room], evidence: [ev1, ev2], incidentRoute: sp.route, outline: sp.outline,
-    passGrants: {
-      [sp.r1.pass]: { when: (s: GameState) => !!s.flags.briefed, hint: 'Read the Incident Wall first: the alert points at the right room.' },
-      [sp.r2.pass]: { when: (s: GameState) => s.evidence.has(ev1.id), hint: 'Nothing points there yet. Retrieve the first piece of evidence and read what it says.' },
-    },
-    rules, containment,
-    interactions: {
-      [propTarget('secure_ops', 'incident_wall')]: (a) => { a.flag('briefed'); a.dialog({ type: 'alert' }); },
-      [sp.r1.evidenceProp]: (a) => { if (!a.evidence(ev1.id)) return; a.flag('ev1'); a.clue('c_ev1', ev1.name, sp.r1.evidenceBody); a.dialog({ type: 'info', title: `${ev1.name} (read-only)`, rows: sp.r1.evidenceRows, body: sp.r1.evidenceBody }); },
-      [sp.r2.evidenceProp]: (a) => { if (!a.evidence(ev2.id)) return; a.flag('ev2'); a.clue('c_ev2', ev2.name, sp.r2.evidenceBody); a.dialog({ type: 'info', title: `${ev2.name} (read-only)`, rows: sp.r2.evidenceRows, body: sp.r2.evidenceBody }); },
-      [sp.responseProp]: (a) => {
-        if (!a.s.flags.ev1 || !a.s.flags.ev2) return a.say('Not enough evidence', 'Collect both pieces of evidence before choosing a response.', 'info', { hint: true });
-        if (a.s.flags.fixed) return a.say('Already fixed', 'Verify the route with the Signal Scanner (1), then file the report.', 'info');
-        a.dialog({
-          type: 'choice', title: 'Choose a response', body: 'Pick the narrowest safe fix. A wrong choice is recoverable: you can try again.',
-          options: sp.responses.map((r) => ({ id: r.id, label: r.label, detail: r.detail })),
-          onChoose: (id) => {
-            const r = sp.responses.find((x) => x.id === id)!;
-            if (r.availabilityHit) a.hit('resp:' + id, r.availabilityHit, r.hitSeconds ?? 60);
-            if (r.integrity) a.adjust('integrity', r.integrity, r.label);
-            if (r.protection) a.adjust('protection', r.protection, r.label);
-            a.data.scope = a.data.scope ?? (r.narrow >= 0.95 ? 'narrow' : 'broad');
-            a.data.narrow = Math.max(a.data.narrow ?? 0, r.narrow);
-            if (r.correct) { a.flag('fixed'); a.status(sp.responseProp, 'fixed'); a.fx('repair', sp.responseProp); a.data.mirrorStuck = false; a.data.silverLag = 0; a.data.bronzeLag = 0; a.say('Fixed', r.result, 'good'); }
-            else { a.unnecessary(); a.say('That works against you', r.result, 'warn'); }
-          },
-        });
-      },
-    },
-    objectives: [
-      { id: 'o_brief', text: 'Read the Incident Wall', hint: 'Press E at the Incident Wall in Secure Ops Control.', done: (s) => !!s.flags.briefed },
-      { id: 'o_p1', text: `Request the ${PASSES[sp.r1.pass].name}`, hint: 'Use the Access Desk or any door reader.', done: (s) => s.passes.has(sp.r1.pass) },
-      { id: 'o_r1', text: `Walk to ${ROOM_BY_ID[sp.r1.room].name} (${ROOM_BY_ID[sp.r1.room].code})`, hint: 'Use the minimap (M) and click the room for a corridor guide.', done: (s) => !!s.flags['visited_' + sp.r1.room] },
-      { id: 'o_scan', text: 'Scan the flagged component with the Signal Scanner (1)', hint: 'Select tool 1 and press E at the highlighted object.', done: (s) => !!s.flags.scanned },
-      { id: 'o_e1', text: 'Retrieve the first evidence', hint: 'Press E at the terminal in the room.', done: (s) => !!s.flags.ev1 },
-      { id: 'o_lens', text: 'Trace the event order with the Forensic Lens (2)', hint: 'Select tool 2 and click the incident route.', done: (s) => !!s.flags.lensed },
-      { id: 'o_p2', text: `Request the ${PASSES[sp.r2.pass].name}`, hint: 'The evidence points at the next room.', done: (s) => s.passes.has(sp.r2.pass) },
-      { id: 'o_e2', text: `Retrieve evidence in ${ROOM_BY_ID[sp.r2.room].name}`, hint: 'Walk there and press E at the highlighted terminal.', done: (s) => !!s.flags.ev2 },
-      { id: 'o_resp', text: 'Choose the narrowest safe response', hint: 'Press E at the response console (see the inspect panel).', done: (s) => !!s.flags.fixed },
-      { id: 'o_verify', text: 'Verify the route with the Signal Scanner (1)', hint: 'Click the incident route and press E with tool 1.', done: (s) => !!s.flags.verified },
-      { id: 'o_report', text: 'File the report at the Evidence Board', hint: 'Return to Secure Ops Control.', done: (s) => !!s.flags.reported },
-    ],
-    canReport: (s) => (!s.flags.verified ? 'Verify the fix first.' : s.evidence.size < 2 ? 'Evidence is missing.' : true),
+    evidencePath: sp.evidencePath, evidence: sp.evidence, incidentRoute: sp.incidentRoute,
+    passGrants: Object.fromEntries(sp.passes.map((p) => [p.pass, { when: p.when, hint: p.hint }])),
+    requiredPasses: sp.required,
+    rules, containment, interactions,
+    goals: sp.goals, recordables: sp.recordables,
+    objectives: (primary.length ? primary : sp.goals.filter((g) => g.kind === 'optional')).map((g) => ({ id: g.id, text: g.text, hint: g.hint ?? 'Follow the evidence.', done: g.done })),
+    setup: (a) => { sp.setup?.(a); },
+    tick: sp.tick,
+    onRevoke: sp.onRevoke,
+    canReport: (s) => { const missing = primary.find((g) => !g.done(s)); return missing ? `Primary objective outstanding: ${missing.text}` : true; },
     isComplete: (s) => !!s.flags.reported,
-    incidents: (s) => (s.flags.fixed ? 0 : 1),
-    scoreInput: (s) => ({ diagnosed: !!s.flags.lensed, verified: !!s.flags.verified, reconciled: !!s.flags.fixed, narrow: s.data.narrow ?? 0.3, privacyOk: s.stats.unnecessary === 0 && s.stats.passDenials <= 1 }),
-    debrief: (s) => ({ what: sp.debrief.what, response: [s.data.scope === 'narrow' ? 'You chose the narrowest safe response.' : 'You chose a broader response than needed: it worked, but it cost availability.', 'You requested read-only, masked passes only as evidence pointed to each room.', 'You verified the route before closing.'], learn: sp.debrief.learn }),
-    setup: (a) => { if (sp.freshnessEffect === 'mirrorStuck') { a.data.mirrorStuck = true; a.data.bronzeLag = 4; } if (sp.freshnessEffect === 'silverLag') { a.data.silverLag = 40; } },
+    incidents: sp.incidents ?? ((s) => (primary.every((g) => g.done(s)) ? 0 : 1)),
+    scoreInput: (s): ScoreInput => ({
+      diagnosed: s.evidence.size > 0, verified: primary.every((g) => g.done(s)), reconciled: !!s.flags.reconciledAll || primary.every((g) => g.done(s)),
+      narrow: sp.narrow ? sp.narrow(s) : (((s.data.containments ?? []) as { narrow: number }[]).length ? Math.min(...(s.data.containments as { narrow: number }[]).map((c) => c.narrow)) : 0.6),
+      privacyOk: s.stats.unnecessary === 0 && s.stats.passDenials <= 1 && !s.flags.unmasked,
+    }),
+    debrief: (s): Debrief => ({ what: sp.debrief.what, response: sp.debrief.response ? sp.debrief.response(s) : ['You worked through the evidence in order, using only read-only, masked access.'], learn: sp.debrief.learn }),
+    nextStep: sp.debrief.nextStep,
   };
+  (mission as MissionDef & { script: ScriptAction[]; spec: ScenarioSpec }).script = sp.script;
+  (mission as MissionDef & { spec: ScenarioSpec }).spec = sp;
   return mission;
 }
+export type ScenarioMission = MissionDef & { script: ScriptAction[]; spec: ScenarioSpec };
 export { propTarget };

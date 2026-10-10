@@ -1,0 +1,61 @@
+import { goal, makeScenario, st } from './scenario';
+import { propTarget } from '../targets';
+
+const AR = propTarget('finance_core', 'ar');
+
+export default makeScenario({
+  id: 'clean-restore', order: 7, title: 'The Clean Restore', tagline: 'A finance module is drifting after a fault. Restore it safely and prove it.', difficulty: 'Hard',
+  theme: 'Recovery readiness: restore from a verified point, in a safe area, and validate before returning to service.',
+  pointsRoom: 'finance_core', incidentRoute: 'card_receipt', clock: ['14:12', '14:40', 'Recovery target 14:40'], parSeconds: 540,
+  alert: { severity: 'High', headline: 'Accounts Receivable module is unreliable after a simulated fault at 14:10', symptoms: ['Receipt totals are drifting', 'Targets: RPO 5 minutes, RTO until 14:40', 'Restore points are listed with timestamps and expected data loss'], impact: 'Totals cannot be trusted until the module is restored and validated.' },
+  briefing: ['The Accounts Receivable module (synthetic) became unreliable at 14:10.', 'Identify the module, choose a verified clean restore point, check its timestamp and expected data loss, restore in a safe recovery area, compare totals against the latest trusted reconciliation, reconnect through the approved route and confirm service and integrity.', 'Restoring anything else adds risk.'],
+  evidence: [
+    { id: 'ev_fault', name: 'Module fault report', sourceRoom: 'finance_core', requiredPass: 'ledger_read_pass', sensitivity: 'Masked ledger data', objective: 'p1', pathStep: 'finance_core' },
+    { id: 'ev_restorepoint', name: 'Restore point metadata', sourceRoom: 'finance_core', requiredPass: 'ledger_read_pass', sensitivity: 'Restore metadata', objective: 'p2', pathStep: 'finance_core' },
+    { id: 'ev_validation', name: 'Post-restore validation', sourceRoom: 'finance_core', requiredPass: 'ledger_read_pass', sensitivity: 'Masked reconciliation totals', objective: 'p4', pathStep: 'finance_core' },
+  ],
+  evidencePath: ['finance_core'],
+  passes: [{ pass: 'ledger_read_pass', when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first.' }],
+  required: ['ledger_read_pass'],
+  steps: [
+    { id: 'identify', at: AR, tool: 'scanner', evidence: 'ev_fault', status: [[AR, 'bad']], mark: [['card_receipt', 'suspicious']], fx: 'scan',
+      info: { title: 'Accounts Receivable: module flagged', rows: [['Module', 'Accounts Receivable (AR)'], ['Fault began', '14:10'], ['Symptom', 'Totals drift; postings inconsistent'], ['Other modules', 'General Ledger and Accounts Payable healthy']], body: 'Only AR is affected. Choose a restore point.' } },
+    { id: 'choose_point', at: AR, tool: 'e', needs: ['identify'], needsMsg: 'Identify the affected module first.', evidence: 'ev_restorepoint',
+      choice: { title: 'Choose a restore point', body: 'Fault began at 14:10. Targets: RPO 5 minutes. Pick a verified clean point.', options: [
+        { id: 'A', label: '14:07 · checksum VERIFIED · expected data loss about 3 minutes', detail: 'Before the fault; within RPO.', correct: true, result: 'Restore point 14:07 chosen: verified, before the fault, within the 5 minute RPO.', gain: { recovery: 6 }, flags: ['pointA'] },
+        { id: 'B', label: '14:11 · checksum NOT verified · expected data loss about 1 minute', detail: 'After the fault began.', correct: false, gain: { recovery: -8 }, result: 'This point is after the fault began and is not verified: it could carry the corruption.' },
+        { id: 'C', label: '09:00 · checksum VERIFIED · expected data loss about 5 hours', detail: 'Safe but loses a lot.', correct: false, completes: true, flags: ['rpoMissed', 'pointC'], gain: { recovery: 1 }, result: 'Verified but five hours old: it misses the RPO and loses a lot of data.' }] } },
+    { id: 'check_point', at: AR, tool: 'lens', needs: ['choose_point'], needsMsg: 'Choose a restore point first.',
+      effect: (a) => { if (!a.s.flags.st_restore) a.flag('verifiedPoint'); },
+      info: (a) => ({ title: 'Forensic Lens: restore point details', rows: [['Restore point', a.s.flags.pointC ? '09:00 (checksum verified)' : '14:07 (checksum verified)'], ['Expected data loss', a.s.flags.pointC ? 'about 5 hours (outside RPO)' : 'about 3 minutes (within RPO)'], ['Fault began', '14:10'], ['Verification', 'Checksum matches the vault record']], body: 'Timestamp and expected data loss checked before restoring.' }), gain: { audit: 3 } },
+    { id: 'restore', at: AR, tool: 'restore', needs: ['choose_point', 'isolate'], needsMsg: 'Restore in the safe recovery area: quarantine the AR module first.',
+      confirm: { title: 'Restore Accounts Receivable to the chosen point?', body: 'Runs in the isolated recovery area. Other modules are not touched.', impacts: [{ label: 'Restores', text: 'Accounts Receivable only', tone: 'good' }, { label: 'Data loss', text: 'As shown on the restore point (card journal replays the rest)', tone: 'warn' }, { label: 'Other modules', text: 'Untouched', tone: 'good' }] },
+      effect: (a) => { if (a.s.flags.st_check_point) a.flag('restored'); else a.flag('restoredUnchecked'); }, gain: { recovery: 14 }, status: [[AR, 'ok']], fx: 'repair' },
+    { id: 'compare_totals', at: AR, tool: 'recon', needs: ['restore'], needsMsg: 'Restore the module first.', evidence: 'ev_validation', effect: (a) => a.flag('reconciledAll'),
+      info: { title: 'Comparison: restored totals vs latest trusted reconciliation', rows: [['Source (restored AR)', 'Accounts Receivable after restore'], ['Source (trusted)', 'Reconciliation at 14:00']], compare: { before: [['Drifting totals', '£5,448.20 (+£35.60 unexplained)']], after: [['Restored AR', '£5,412.60'], ['Trusted reconciliation', '£5,412.60'], ['Difference', 'None']] }, body: 'Totals match the latest trusted reconciliation.' } },
+    { id: 'confirm', at: AR, tool: 'scanner', needs: ['reconnect'], needsMsg: 'Reconnect the module through its approved route first.', mark: [['card_receipt', 'restored']], fx: 'sparkle', gain: { recovery: 4 },
+      say: ['Service and integrity confirmed', 'Accounts Receivable is processing, availability is normal and integrity is intact.', 'good'] },
+  ],
+  contain: [{ id: 'isolate', target: AR, scope: 'narrow', releaseId: 'reconnect', canRelease: (s) => (s.flags.st_compare_totals ? true : 'Do not reconnect yet: validate the restored totals first.'),
+    cfg: { availability: 4, narrow: 1, effective: true, notes: [{ label: 'Isolates', text: 'Only the AR module becomes a safe recovery area.', tone: 'good' }, { label: 'Delays', text: 'Receipts queue (not lost) until it reconnects.', tone: 'warn' }] } }],
+  goals: [
+    goal('p1', 'primary', 'Identify the affected module and choose a verified clean restore point', (s) => !!s.flags.st_identify && !!s.flags.st_choose_point, 'Signal Scanner (1) at Accounts Receivable, then E to choose a restore point.'),
+    goal('p2', 'primary', 'Check the displayed restore timestamp and expected data loss', st('check_point'), 'Forensic Lens (2) at Accounts Receivable.'),
+    goal('p3', 'primary', 'Restore the module in a safe recovery area', (s) => !!s.flags.st_isolate && !!s.flags.st_restore, 'Quarantine the AR module (3), then Clean Restore Beacon (6).'),
+    goal('p4', 'primary', 'Compare restored totals against the latest trusted reconciliation', st('compare_totals'), 'Reconciliation Wand (7) at Accounts Receivable.'),
+    goal('p5', 'primary', 'Reconnect the module through the approved route', st('reconnect'), 'Release the quarantine (3 again) once the totals are validated.'),
+    goal('p6', 'primary', 'Confirm service availability and data integrity', st('confirm'), 'Signal Scanner (1) at Accounts Receivable.'),
+    goal('o1', 'optional', 'Meet the displayed recovery time and recovery point targets', (s) => !!s.flags.st_confirm && !s.flags.rpoMissed && s.deadlineLeft > 0),
+    goal('o2', 'optional', 'Avoid restoring unrelated modules', (s) => !s.flags.unrelatedRestore),
+    goal('o3', 'optional', 'Record the validation evidence before returning to normal operation', (s) => !!s.flags.rec_validation && (s.data.rec_validation_at ?? 1e9) <= (s.data.reconnect_at ?? 1e9)),
+    goal('s1', 'stretch', 'Verify the restore point before restoring, and pick it first time', (s) => !!s.flags.verifiedPoint && !!s.flags.restored && (s.data.wrong ?? 0) === 0),
+    goal('s2', 'stretch', 'No hints and recovery readiness above 90%', (s) => s.stats.hintsUsed === 0 && s.recovery >= 90),
+  ],
+  recordables: [{ id: 'validation', label: 'Validation: restored totals match the 14:00 trusted reconciliation', when: (s) => !!s.flags.st_compare_totals }],
+  tick: (a) => { const s = a.s; if (s.flags.st_reconnect && s.data.reconnect_at === undefined) s.data.reconnect_at = s.elapsed; },
+  debrief: { what: 'A simulated fault corrupted the Accounts Receivable module at 14:10. It was restored from a verified clean point in an isolated recovery area, validated, and reconnected.',
+    learn: 'Choose a verified point before the fault, check its timestamp and expected data loss, restore only the affected module in a safe area, validate against a trusted reconciliation and record the evidence before reconnecting.',
+    nextStep: () => 'Run a scheduled restore test so the next recovery point is already known-good, and keep recovery time and recovery point targets visible on the Control Room wall.',
+    response: (s) => [s.flags.pointC ? 'You chose a verified but old restore point: safe, but it missed the recovery point target.' : 'You chose a verified point within the recovery point target.', s.flags.verifiedPoint ? 'You checked the restore point before restoring.' : 'You restored without checking the point details first.', s.flags.unrelatedRestore ? 'You tried to restore an unrelated module.' : 'You restored only the affected module.'] },
+  script: [['pass', 'ledger_read_pass'], ['step', 'identify'], ['step', 'choose_point'], ['step', 'check_point'], ['contain', 'isolate'], ['step', 'restore'], ['step', 'compare_totals'], ['record', 'validation'], ['release', 'isolate'], ['step', 'confirm'], ['report']],
+});

@@ -7,7 +7,7 @@
 | E | Use the selected tool on the nearest highlighted object, or on the selected target. |
 | 1-8 | Select tool (the brief requires 1-4; 5-8 are Token Rotation, Clean Restore, Reconciliation Wand, Flow Rerouter) |
 | Click object / flow line / reader / room | Select and inspect (source, destination, status, impact for routes; pass, scope and lock state for doors) |
-| M / F / L / R | Minimap, Fabric panel, incident log, route overlay |
+| M / F / L / R / G | Minimap, Fabric panel, incident log, route overlay, goals (primary / optional / stretch) |
 | Mouse wheel, + / -, drag | Zoom (0.55x-3x) and pan; C or "Return to player" re-centres |
 | Esc | Pause menu |
 

@@ -16,6 +16,7 @@ import type { MissionDef } from '../../data/missions/types';
 import type { Cell, DoorDef, PropDef, RoomDef, RoomId } from '../types';
 import type { SceneApi } from '../sceneApi';
 import { app } from '../../app';
+import { MEASURE_KEYS, MEASURE_LABEL, confidenceWord, measuresOf, overallConfidence } from '../systems/Confidence';
 
 type Facing = 'se' | 'sw' | 'nw' | 'ne';
 type Pose = 'idle' | 'walk' | 'scan' | 'repair' | 'success';
@@ -60,6 +61,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private guideUntil = 0;
   private guideCells: Cell[] = [];
   private highlight!: Phaser.GameObjects.Graphics;
+  private wallBoard!: Phaser.GameObjects.Text;
+  private wallSig = '';
   private unsub: (() => void)[] = [];
   private closing = false;
   private entityCache = new Map<string, string>();
@@ -85,6 +88,10 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.buildPlayer();
     this.buildInput();
     this.buildCamera();
+    // Service Confidence summary on the Control Room wall (above the Incident Wall screen)
+    const wp = this.state.mission.startRoom === 'secure_ops' ? ROOM_BY_ID.secure_ops.props.find((p) => p.key === 'incident_wall') : undefined;
+    const ws = wp ? this.S(wp.gx + 0.5, wp.gy + 0.5) : { x: 0, y: 0 };
+    this.wallBoard = this.add.text(ws.x, ws.y - 92, '', { fontFamily: 'ui-monospace, Menlo, Consolas, monospace', fontSize: '8px', color: PALETTE.white, backgroundColor: 'rgba(11,20,36,0.92)', padding: { x: 4, y: 3 }, align: 'left' }).setOrigin(0.5, 1).setDepth(15500).setResolution(3);
     this.prompt = this.add.text(0, 0, '', { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: PALETTE.navy, backgroundColor: PALETTE.amber, padding: { x: 5, y: 2 } }).setOrigin(0.5, 1).setDepth(21000).setResolution(2).setVisible(false);
 
     this.runner.start();
@@ -227,6 +234,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     kb.on('keydown-L', () => app.ui?.openPanel('log'));
     kb.on('keydown-R', () => this.setRoutesVisible(!this.flow.visible));
     kb.on('keydown-C', () => this.returnToPlayer());
+    kb.on('keydown-G', () => { if (!this.state.paused) app.ui?.openGoals(); });
     kb.on('keydown-PLUS', () => this.zoomBy(0.15));
     kb.on('keydown-MINUS', () => this.zoomBy(-0.15));
 
@@ -504,6 +512,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   // ------------------------------------------------------------------ per-frame sync ----
   private syncVisuals(): void {
     this.syncBarriers();
+    this.updateWallBoard();
     // status badges above props
     for (const r of ROOMS) for (const p of r.props) {
       const st = this.state.status[p.id];
@@ -521,6 +530,15 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.refreshAccessLabelsOnly();
   }
   private refreshAccessLabelsOnly(): void { /* labels refreshed on pass events */ }
+
+  /** Service Confidence on the Control Room wall: five measures plus the balanced overall score (text and bars, not colour only). */
+  private updateWallBoard(): void {
+    if (!this.wallBoard) return;
+    const m = measuresOf(this.state), o = overallConfidence(m);
+    const bar = (v: number) => '\u2588'.repeat(Math.round(v / 10)) + '\u2591'.repeat(10 - Math.round(v / 10));
+    const text = `SERVICE CONFIDENCE ${o}% ${confidenceWord(o).toUpperCase()}\n` + MEASURE_KEYS.map((k) => `${MEASURE_LABEL[k].name.slice(0, 11).padEnd(11)} ${bar(m[k])} ${String(m[k]).padStart(3)}`).join('\n');
+    if (text !== this.wallSig) { this.wallSig = text; this.wallBoard.setText(text); }
+  }
 
   private syncEntities(time: number): void {
     const reduced = settings.data.reducedMotion;
