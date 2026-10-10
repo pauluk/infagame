@@ -1,4 +1,5 @@
 import type { Cell, RoomId } from './types';
+import type { TeamController } from './systems/Team';
 
 /** What the DOM UI may ask the Phaser facility scene to do (the UI never touches Phaser objects). */
 export interface SceneApi {
@@ -14,4 +15,7 @@ export interface SceneApi {
   focusOn(target: string): void;
   /** Tutorial mode: pulse a beacon on these targets (empty array clears it). */
   setCoachTargets(ids: string[]): void;
+  /** Manager mode and Auto-play. */
+  team: TeamController;
+  focusMember(id: string): void;
 }

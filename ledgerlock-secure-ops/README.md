@@ -15,7 +15,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # tsc --noEmit + vite build
 npm run preview    # serve the production build on http://localhost:4173
-npm run test       # 40 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
+npm run test       # 54 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
 npm run typecheck  # tsc --noEmit
 npm run test:e2e   # real-browser playthrough of the tutorial (needs `npm run preview` running and Playwright); also tests/e2e-campaign.mjs
 npm run assets:render   # OPTIONAL: re-render all sprites with Blender (see docs/art-pipeline.md)
@@ -48,6 +48,14 @@ Accessibility: mute, **reduced motion** (no pulses/shakes/bobbing; route directi
 ### Tutorial mode
 Pick **Tutorial Mode** on the title screen (or tick it in the briefing, Settings or the pause menu). A coach card shows the current step, what to do, why it matters and which tool to use; a bouncing arrow marks the target and the tool belt highlights the tool. Hints are free, the clock runs slower, and stretch goals are not counted while it is on. It switches on automatically the first time you open Duplicate Ghost and can be turned off at any time.
 (Coaching is written for Duplicate Ghost; other missions show the normal guidance.)
+
+### Manager mode and Auto-play
+- **Manager mode** (title screen, briefing, Settings, pause menu or the Team panel): three teammates join you, each with a role. **Priya** investigates (scanner, lens, evidence), **Marcus** contains and fixes (quarantine, patch, restore, reroute) and **Lena** handles passes, reconciliation, records and the report. You order them: open a card, pick a tool on the belt and a target on the map, press **Use ... →** (or **Read / use**), or press the **▶ suggested** button for their next task. They walk the real corridors, need the same passes, and use the same tools and rules you do.
+- **Auto**: every card (including **You**) has an Auto switch. A member on Auto picks the next ready task for their role, and covers for others after a short pause. Your own Auto-play walks your avatar through the playbook; **move or click yourself to take the controls back**. A **1× / 2× / 4×** speed control is there while anything is on Auto.
+- **Decisions stay yours by default.** When a teammate reaches a choice or a confirmation (a diagnosis, a containment) they post it in the Team panel's messages ("Needs your call") and wait. Tick *Let the team make the calls* to let them pick the best-practice answer. Evidence and findings they collect arrive as messages you can open.
+- **Stuck teammates** say why (a pass the clue does not yet justify, a step that comes first) instead of guessing.
+- Fairness: stretch goals are earned by hand, so they are not counted for any run in which Auto did an action (shown in the debrief). Everything else is scored normally.
+- Keyboard: **T** shows or hides the panel.
 
 ## Campaign and missions
 

@@ -54,13 +54,17 @@ export class GameState extends Emitter<StateEvents> {
   elapsed = 0;
   logEntries: LogEntry[] = [];
   scoreEvents: ScoreEvent[] = [];
-  stats = { toolUses: 0, unnecessary: 0, availSum: 0, availTime: 0, minAvail: 100, hintsUsed: 0, passDenials: 0, maskedOnly: true };
+  stats = { autoActions: 0, orders: 0, toolUses: 0, unnecessary: 0, availSum: 0, availTime: 0, minAvail: 100, hintsUsed: 0, passDenials: 0, maskedOnly: true };
   selectedTool: ToolId = 'scanner';
   selectedTarget: string | null = null;
   paused = false;
   /** Tutorial mode: guided coaching, hints are free, incidents run slower, stretch goals are not counted. */
   tutorial = false;
   complete = false;
+  /** Auto-play / team mode: game speed multiplier (1, 2 or 4). */
+  speed = 1;
+  /** Team controller hook: may take over a dialog raised by a teammate's action. Returns true when it handled it. */
+  decide?: (spec: DialogSpec) => boolean;
   fabricSnapshot: FabricSnapshot | null = null;
   latestResult: ResultCard | null = null;
   player = { x: 0, y: 0, room: null as RoomId | null };

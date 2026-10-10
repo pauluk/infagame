@@ -17,3 +17,7 @@
 
 ## Tutorial mode
 Optional coaching layer (`src/data/coach.ts`, `renderCoach` in `src/ui/ui.ts`). Setting: `tutorial` in `ledgerlock.settings.v1`. Free hints, 0.6x clock speed, stretch goals excluded from campaign results. Browser check: `tests/e2e-tutorial.mjs`.
+
+## Manager mode and Auto-play
+Team panel (**T**): *Team on duty* calls in Priya (investigator), Marcus (containment) and Lena (records and access). Open a card to give an order: **▶ suggested task**, **Use <tool> → <selected target>**, or **Read / use**. **Auto** per member; **Everyone on Auto**; **1× 2× 4×** while Auto runs. *Let the team make the calls* answers choices and confirmations for you; otherwise they appear under messages as "Needs your call". Moving or clicking yourself stops your own Auto-play. Auto does the work: stretch goals do not count for that run.
+Implementation: `src/game/systems/Playbook.ts` (per-mission playbooks), `Team.ts` (controller), `Reach.ts` (standing cells and range), `src/ui/teamPanel.ts`. Browser checks: `tests/e2e-team.mjs`, `tests/e2e-autoplay.mjs`.

@@ -71,7 +71,7 @@ export class MissionRunner {
       entity: (id, patch) => s.setEntity(id, patch),
       removeEntity: (id) => s.removeEntity(id),
       fx: (type, target) => s.emit('fx', { type, target }),
-      dialog: (spec) => s.emit('dialog', spec),
+      dialog: (spec) => { if (s.decide?.(spec)) return; s.emit('dialog', spec); },
       log: (t, tone) => s.log(t, tone),
       unnecessary: () => { s.stats.unnecessary++; },
       contain(target) { s.contained[target] = { rerouted: false, since: s.elapsed }; runner.recompute(); s.emit('fx', { type: 'barrier', target }); },
@@ -86,7 +86,7 @@ export class MissionRunner {
   tick(dtReal: number): void {
     const s = this.s;
     if (s.paused || s.complete) return;
-    const dt = dtReal * this.timeScale * (s.tutorial ? 0.6 : 1);
+    const dt = dtReal * this.timeScale * (s.tutorial ? 0.6 : 1) * s.speed;
     s.elapsed += dt;
     for (const [k, h] of Object.entries(s.hits)) if (h.until && s.elapsed >= h.until) delete s.hits[k];
     for (const [p, until] of Object.entries(s.passExpiry)) if (s.elapsed >= until) { delete s.passExpiry[p]; s.passes.delete(p as PassId); s.flags['expired_' + p] = true; s.log(`${PASSES[p as PassId].name} expired (time-limited).`, 'info'); s.emit('pass', { pass: p as PassId, granted: false }); }

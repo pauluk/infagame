@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { C, PALETTE, TILE_H, TILE_W, type PaletteKey } from '../constants';
 import { ATLAS_GROUPS, hasFrame, makeImage } from '../art';
-import { depthOf, findPath, guideToRoom, nearestReachable, toGrid, toScreen, walkableFor } from '../systems/Grid';
+import { depthOf, findPath, guideToRoom, nearestReachable, nearestWalkable, toGrid, toScreen, walkableFor } from '../systems/Grid';
+import { reachRange } from '../systems/Reach';
+import { TeamController, type ExternalBody, type Member } from '../systems/Team';
 import { FlowRenderer } from '../systems/FlowRenderer';
 import { GameState } from '../systems/GameState';
 import { MissionRunner } from '../systems/MissionRunner';
@@ -63,6 +65,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private highlight!: Phaser.GameObjects.Graphics;
   private coach!: Phaser.GameObjects.Graphics;
   private coachTargets: string[] = [];
+  team!: TeamController;
+  private crewSprites = new Map<string, { img: Phaser.GameObjects.Image; tag: Phaser.GameObjects.Text; ring: Phaser.GameObjects.Graphics }>();
   private wallBoard!: Phaser.GameObjects.Text;
   private wallSig = '';
   private unsub: (() => void)[] = [];
@@ -90,6 +94,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.highlight = this.add.graphics().setDepth(19500);
     this.coach = this.add.graphics().setDepth(21800);
     this.buildPlayer();
+    this.buildTeam();
     this.buildInput();
     this.buildCamera();
     // Service Confidence summary on the Control Room wall (above the Incident Wall screen)
@@ -226,6 +231,50 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.player = makeImage(this, 'characters', 'eng_se_idle_0', s.x, s.y);
   }
 
+  /** Team (Manager mode) and Auto-play share one controller; the player's avatar is driven through this body when Auto-play is on. */
+  private buildTeam(): void {
+    const room = ROOM_BY_ID[this.state.mission.startRoom], walk = walkableFor(this.state.passes);
+    const spawn = [0, 1, 2, 3].map((i) => nearestWalkable(walk, room.x0 + 2 + i * 2, room.y0 + 4, 4) ?? this.from);
+    const body: ExternalBody = {
+      cell: () => this.to ?? this.from, pos: () => this.pos,
+      walkTo: (c) => this.walkTo(c), idle: () => !this.to && !this.path.length,
+      cancel: () => { this.path = []; }, pose: (t) => this.setPoseFor(t),
+    };
+    this.team = new TeamController(this.state, this.runner, { team: settings.data.team, spawn, body, autoDecide: () => settings.data.autoDecide });
+    this.unsub.push(() => this.team.dispose());
+    for (const m of this.team.members) {
+      if (m.external) continue;
+      const img = makeImage(this, 'characters', 'eng_se_idle_0', 0, 0).setTint(m.color);
+      const ring = this.add.graphics().setDepth(1);
+      const tag = this.add.text(0, 0, m.name, { fontFamily: 'system-ui, sans-serif', fontSize: '9px', color: '#0b1424', backgroundColor: '#' + m.color.toString(16).padStart(6, '0'), padding: { x: 3, y: 1 } }).setOrigin(0.5, 1).setResolution(3);
+      this.crewSprites.set(m.id, { img, tag, ring });
+    }
+  }
+  /** The manager takes the controls back: manual movement stops the player's own Auto-play. */
+  private takeOver(): void { if (this.team?.you.auto) { this.team.setAuto('you', false); this.team.recall('you'); app.ui?.toast('You have the controls again. Auto-play is off.', 'info'); } }
+  focusMember(id: string): void {
+    const m = this.team.member(id); if (!m) return;
+    if (m.external) return this.returnToPlayer();
+    const p = this.S(m.pos.x, m.pos.y);
+    this.followPlayer = false; this.cameras.main.stopFollow(); this.cameras.main.pan(p.x, p.y, 450, 'Sine.easeInOut');
+  }
+  private syncTeam(time: number): void {
+    const on = this.team.crewOn;
+    for (const [id, sp] of this.crewSprites) {
+      const m = this.team.member(id) as Member;
+      sp.img.setVisible(on); sp.tag.setVisible(on); sp.ring.setVisible(on);
+      if (!on) continue;
+      const pose: Pose = m.phase === 'walking' ? 'walk' : m.phase === 'working' ? (m.task?.tool === 'patch' ? 'repair' : 'scan') : m.phase === 'waiting' || m.phase === 'blocked' ? 'idle' : 'idle';
+      const idx = Math.floor((time / 1000) * POSE_FPS[pose] + m.pos.x * 3) % POSE_FRAMES[pose];
+      const frame = `eng_${m.facing}_${pose}_${idx}`;
+      if (hasFrame(this, 'characters', frame) && sp.img.frame.name !== frame) sp.img.setFrame(frame);
+      const s = this.S(m.pos.x, m.pos.y);
+      sp.img.setPosition(s.x, s.y).setDepth(depthOf(m.pos.x, m.pos.y, 3));
+      sp.tag.setPosition(s.x, s.y - 74).setDepth(depthOf(m.pos.x, m.pos.y, 4)).setText(m.name + (m.pending && !m.pending.resolved ? ' ?' : m.phase === 'blocked' ? ' !' : m.auto ? ' ⟳' : ''));
+      sp.ring.clear().lineStyle(2, m.color, 0.9).strokeEllipse(s.x, s.y + 2, 30, 14).setDepth(depthOf(m.pos.x, m.pos.y, 1));
+    }
+  }
+
   private buildInput(): void {
     const kb = this.input.keyboard!;
     this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -238,6 +287,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     kb.on('keydown-L', () => app.ui?.openPanel('log'));
     kb.on('keydown-R', () => this.setRoutesVisible(!this.flow.visible));
     kb.on('keydown-C', () => this.returnToPlayer());
+    kb.on('keydown-T', () => (document.getElementById('b-team') as HTMLElement | null)?.click());
     kb.on('keydown-G', () => { if (!this.state.paused) app.ui?.openGoals(); });
     kb.on('keydown-PLUS', () => this.zoomBy(0.15));
     kb.on('keydown-MINUS', () => this.zoomBy(-0.15));
@@ -306,28 +356,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   }
 
   /** Is the player close enough to use `id`? Returns a hint when not. */
-  inRange(id: string): { ok: boolean; hint?: string } {
-    const t = describeTarget(id); if (!t) return { ok: false };
-    const px = this.pos.x, py = this.pos.y;
-    if (t.prop) return Math.hypot(t.prop.gx + 0.5 - px, t.prop.gy + 0.5 - py) <= 2.3 ? { ok: true } : { ok: false, hint: `Walk closer to the ${t.name}.` };
-    if (t.door) return Math.hypot(t.door.readerCell.x + 0.5 - px, t.door.readerCell.y + 0.5 - py) <= 3 ? { ok: true } : { ok: false, hint: 'Walk up to the door reader.' };
-    if (t.ext) return { ok: true };
-    if (t.room) { const here = roomAt(Math.floor(px), Math.floor(py)); return here?.id === t.room.id ? { ok: true } : { ok: false, hint: `Go to ${t.room.name} first.` }; }
-    if (t.route) {
-      const here = roomAt(Math.floor(px), Math.floor(py))?.id;
-      const rooms = routeRooms(t.route);
-      if (here && rooms.includes(here)) return { ok: true };
-      const pts = routePoints(t.route);
-      let best = Infinity;
-      for (let i = 1; i < pts.length; i++) {
-        const [ax, ay] = pts[i - 1], [bx, by] = pts[i], dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1;
-        const tt = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2));
-        best = Math.min(best, Math.hypot(px - (ax + tt * dx), py - (ay + tt * dy)));
-      }
-      return best <= 2.6 ? { ok: true } : { ok: false, hint: `Stand in ${rooms.map((r) => ROOM_BY_ID[r].name).join(', ')} or next to the route.` };
-    }
-    return { ok: false };
-  }
+  inRange(id: string): { ok: boolean; hint?: string } { return reachRange(id, this.pos.x, this.pos.y); }
 
   private nearestInteractable(): string | null {
     let best: { id: string; d: number } | null = null;
@@ -393,7 +422,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     const g = toGrid(wx, wy), cx = Math.floor(g.gx), cy = Math.floor(g.gy);
     const room = roomAt(cx, cy);
     if (room) this.selectTarget('room:' + room.id); else this.selectTarget(null);
-    if (GRID.kind[cy]?.[cx] && GRID.kind[cy][cx] !== 'void') this.walkTo({ x: cx, y: cy });
+    if (GRID.kind[cy]?.[cx] && GRID.kind[cy][cx] !== 'void') { this.takeOver(); this.walkTo({ x: cx, y: cy }); }
   }
 
   // ------------------------------------------------------------------ player ----
@@ -439,6 +468,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private updatePlayer(dt: number, time: number): void {
     const walk = walkableFor(this.state.passes);
     const input = this.readDir();
+    if ((input.x || input.y) && this.team.you.auto) this.takeOver();
     if ((input.x || input.y) && this.path.length) { this.path = []; this.autoApproach = null; }
     let moving = false;
     if (!this.to) {
@@ -577,7 +607,12 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   override update(time: number, delta: number): void {
     if (this.closing || !this.sys.isActive()) return;
     const dt = Math.min(0.05, delta / 1000);
-    if (!this.state.paused) { this.runner.tick(dt); this.updatePlayer(dt, time); }
+    if (!this.state.paused) {
+      const k = this.state.speed;
+      this.runner.tick(dt); this.team.update(dt * k);
+      this.updatePlayer(this.team.you.auto ? dt * k : dt, time);
+    }
+    this.syncTeam(time);
     this.syncEntities(time);
     const rerouted = new Set(Object.entries(this.state.contained).filter(([, c]) => c.rerouted).map(([k]) => k.replace('route:', '')));
     this.flow.draw(time, this.state.routeStates, this.state.selectedTarget, settings.data.reducedMotion, rerouted);

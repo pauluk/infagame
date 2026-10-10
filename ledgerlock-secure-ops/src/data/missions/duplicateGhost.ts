@@ -163,6 +163,7 @@ const mission: MissionDef = {
     goal('s2', 'stretch', 'Finish in under 7 minutes with no hints', (s) => !!s.flags.reconciled && s.elapsed < 420 && s.stats.hintsUsed === 0),
   ],
   recordables: [{ id: 'recon_result', label: 'Final reconciliation: 128 expected / 128 received / 128 posted', when: (s) => !!s.flags.reconciled }],
+  bestChoice: { 'Diagnosis: what are we dealing with?': 'bug' },
   nextStep: () => 'Require an idempotency key on every receipt event, and keep the replay path quarantine runbook next to the Settlement Notifier.',
   alert: { severity: 'Medium', headline: 'Receipt count mismatch: card receipt R-77•• seen more than once', points: 'card_payments',
     symptoms: ['Receipt count mismatch between Card Payments and the event stream', 'Accounts Receivable has not flagged a variance yet', 'Valid card receipts are still arriving'],

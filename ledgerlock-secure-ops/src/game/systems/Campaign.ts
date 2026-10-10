@@ -62,7 +62,7 @@ export class Campaign {
     const before = { ...this.data.measures };
     const final = measuresOf(s, true);
     const goals = { primary: [] as string[], optional: [] as string[], stretch: [] as string[] };
-    for (const g of m.goals) if (g.done(s) && !(s.tutorial && g.kind === 'stretch')) goals[g.kind].push(g.id);   // stretch goals do not count in Tutorial mode
+    for (const g of m.goals) if (g.done(s) && !((s.tutorial || s.stats.autoActions > 0) && g.kind === 'stretch')) goals[g.kind].push(g.id);   // stretch goals are earned by hand: not in Tutorial mode or when Auto did any of the work
     const score = computeScore(s);
     const badges = evaluateBadges(s);
     const prev = this.data.missions[m.id];

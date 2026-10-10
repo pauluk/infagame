@@ -163,6 +163,7 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
     }),
     debrief: (s): Debrief => ({ what: sp.debrief.what, response: sp.debrief.response ? sp.debrief.response(s) : ['You worked through the evidence in order, using only read-only, masked access.'], learn: sp.debrief.learn }),
     nextStep: sp.debrief.nextStep,
+    bestChoice: Object.fromEntries(sp.steps.filter((x) => x.choice).map((x) => [x.choice!.title, (x.choice!.options.find((o) => o.correct) ?? x.choice!.options[0]).id])),
   };
   (mission as MissionDef & { script: ScriptAction[]; spec: ScenarioSpec }).script = sp.script;
   (mission as MissionDef & { spec: ScenarioSpec }).spec = sp;

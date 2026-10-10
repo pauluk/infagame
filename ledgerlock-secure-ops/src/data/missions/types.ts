@@ -100,6 +100,8 @@ export interface MissionDef {
   /** Short explanation of the safest next step, shown in the debrief. */
   nextStep: (s: GameState) => string;
   onRevoke?: (a: MissionApi, pass: PassId) => void;
+  /** Best-practice answer for each decision dialog (by dialog title). Used when a teammate or Auto-play decides for the player. */
+  bestChoice?: Record<string, string>;
 }
 
 export interface ScoreInput {

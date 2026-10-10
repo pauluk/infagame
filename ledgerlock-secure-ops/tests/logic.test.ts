@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONNECTIONS, GRID, ROOMS, ROOM_BY_ID, isWalkable } from '../src/data/map';
 import { PASSES, PASS_BY_ROOM } from '../src/data/passes';
 import { ROUTES, routePoints } from '../src/data/routes';
-import { findPath, walkableFor } from '../src/game/systems/Grid';
+import { findPath, nearestWalkable, walkableFor } from '../src/game/systems/Grid';
 import { GameState } from '../src/game/systems/GameState';
 import { MissionRunner } from '../src/game/systems/MissionRunner';
 import { computeScore } from '../src/game/systems/Scoring';
@@ -329,5 +329,73 @@ describe('Fabric demo adapter', () => {
     expect(ok.mode).toBe('demo'); expect(ok.label).toBe('Demo data'); expect(ok.dashboard.status).toBe('healthy'); expect(ok.stages).toHaveLength(3);
     const lag = await a.getSnapshot({ elapsedMin: 20, mirrorPaused: true, duplicatesInBronze: 2, verified: false });
     expect(lag.freshnessMin).toBeGreaterThan(ok.freshnessMin); expect(lag.dashboard.status).toBe('stale');
+  });
+});
+
+// ---------------------------------------------------------------- team mode and auto-play ----
+import { TeamController, type ExternalBody } from '../src/game/systems/Team';
+import { playbookFor } from '../src/game/systems/Playbook';
+
+function teamRun(m: (typeof MISSIONS)[number], o: { team: boolean; autoDecide: boolean; auto?: 'all' | 'you' | 'none'; limit?: number; answer?: boolean }) {
+  const s = new GameState(m); const run = new MissionRunner(s); run.start(); s.flags.briefed = true;
+  const r = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+  const spawn = [0, 1, 2, 3].map((i) => nearestWalkable(walk, r.x0 + 2 + i * 2, r.y0 + 4, 4)!);
+  let me = { x: spawn[0].x + 0.5, y: spawn[0].y + 0.5 };
+  const body: ExternalBody = { cell: () => ({ x: Math.floor(me.x), y: Math.floor(me.y) }), pos: () => me, walkTo: (c) => { me = { x: c.x + 0.5, y: c.y + 0.5 }; }, idle: () => true, cancel: () => {}, pose: () => {} };
+  const team = new TeamController(s, run, { team: o.team, spawn, body, autoDecide: () => o.autoDecide });
+  const modal: any[] = []; s.on('dialog', (d) => modal.push(d));
+  if (o.auto !== 'none') for (const mem of team.members) if (o.auto !== 'you' || mem.id === 'you') team.setAuto(mem.id, true);
+  const dt = 0.25, limit = o.limit ?? 2400;
+  for (let t = 0; t < limit / dt && !s.complete; t++) {
+    run.tick(dt); team.update(dt);
+    // a human answering whatever a teammate or a modal asks for
+    for (const it of team.inbox) if (!it.resolved && it.kind === 'decision' && o.answer !== false) {
+      const sp = it.spec as any; if (sp.type === 'choice') sp.onChoose(m.bestChoice?.[sp.title] ?? sp.options[0].id); else sp.onConfirm();
+    }
+    while (modal.length) { const d = modal.shift(); if (d.type === 'choice') d.onChoose(m.bestChoice?.[d.title] ?? d.options[0].id); else if (d.type === 'confirm') d.onConfirm(); else if (d.type === 'timeline' && d.onClose) d.onClose(); }
+  }
+  return { s, team, run };
+}
+
+describe('team mode and auto-play', () => {
+  const playable = MISSIONS.filter((m) => playbookFor(m).length > 0);
+  it('every mission has a playbook', () => { expect(playable.length).toBe(MISSIONS.length); });
+  for (const m of MISSIONS) {
+    it(`${m.title}: a team on auto (deciding for the manager) finishes it with every primary goal met`, () => {
+      const { s } = teamRun(m, { team: true, autoDecide: true });
+      expect(s.complete).toBe(true);
+      for (const g of m.goals.filter((x) => x.kind === 'primary')) expect(g.done(s), g.text).toBe(true);
+    });
+  }
+  it('solo Auto-play finishes the tutorial; the manager answers the decisions', () => {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const { s } = teamRun(m, { team: false, autoDecide: false, auto: 'you' });
+    expect(s.complete).toBe(true);
+    expect(m.goals.filter((x) => x.kind === 'primary').every((g) => g.done(s))).toBe(true);
+  });
+  it('a team that asks the manager waits for the answer and does not decide for them', () => {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const { s, team } = teamRun(m, { team: true, autoDecide: false, answer: false, limit: 600 });
+    expect(s.complete).toBe(false);
+    const open = team.inbox.filter((i) => i.kind === 'decision' && !i.resolved);
+    expect(open.length).toBeGreaterThan(0);
+    expect(s.flags.diagnosed).toBeFalsy();
+  });
+  it('orders are carried out with the chosen tool, and stretch goals are not counted once Auto did the work', () => {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    const r = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+    const team = new TeamController(s, run, { team: true, spawn: [nearestWalkable(walk, r.x0 + 4, r.y0 + 4, 4)!], autoDecide: () => true });
+    expect(team.order('priya', { tool: 'e', target: 'prop:secure_ops.incident_wall' })).toBeNull();
+    for (let i = 0; i < 400 && !s.flags.briefed; i++) { run.tick(0.25); team.update(0.25); }
+    expect(s.flags.briefed).toBe(true);
+    expect(s.stats.orders).toBe(1); expect(s.stats.autoActions).toBe(0);
+  });
+  it('auto work counts: stretch goals are skipped in the campaign record', () => {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const { s } = teamRun(m, { team: true, autoDecide: true });
+    expect(s.stats.autoActions).toBeGreaterThan(5);
+    const out = new Campaign().recordResult(s);
+    expect(out.goals.stretch).toEqual([]);
   });
 });
