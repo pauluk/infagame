@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONNECTIONS, GRID, ROOMS, ROOM_BY_ID, isWalkable } from '../src/data/map';
+import { DOORS, DOOR_BY_ID, GATE, GRID, LINKS, LINK_BY_ID, LINK_RULES, LAYOUT_JUNCTIONS, ROOMS, ROOM_BY_ID, ENTRANCE, EXTERNALS, cellKey, doorInfo, isWalkable, linkInfo } from '../src/data/map';
 import { PASSES, PASS_BY_ROOM } from '../src/data/passes';
 import { ROUTES, routePoints } from '../src/data/routes';
 import { findPath, nearestWalkable, walkableFor } from '../src/game/systems/Grid';
@@ -18,49 +18,98 @@ const ALL_PASSES = new Set(Object.keys(PASSES) as PassId[]);
 const NO_ROOM_PASSES = new Set<PassId>(['ops_pass']);
 
 describe('facility map', () => {
-  it('has the 12 required room ids at the required positions', () => {
+  it('has the 12 core rooms with their ids and codes, plus the Audit Gallery and the Payroll & Pensions office', () => {
     const want: Record<string, string> = { api_gateway: 'A1', event_stream: 'B1', fabric_platform: 'C1', integration_exchange: 'D1', service_payments: 'A2', finance_core: 'B2', payment_orchestration: 'C2', bacs_vault: 'D2', secure_ops: 'A3', card_payments: 'B3', debt_recovery: 'C3', agency_handoff: 'D3' };
     for (const [id, code] of Object.entries(want)) expect(ROOM_BY_ID[id as RoomId]?.code).toBe(code);
-    expect(ROOMS).toHaveLength(12);
+    expect(ROOM_BY_ID.audit_gallery.name).toBe('Audit Gallery'); expect(ROOM_BY_ID.payroll_pensions.name).toBe('Payroll & Pensions Office');
+    expect(ROOM_BY_ID.secure_ops.name).toBe('Secure Operations Atrium');
+    expect(ROOMS).toHaveLength(14);
   });
-  it('uses 10 x 8 rooms with at least 2 cells between them', () => {
-    for (const r of ROOMS) { expect(r.w).toBe(10); expect(r.h).toBe(8); }
-    expect(ROOM_BY_ID.event_stream.x0 - (ROOM_BY_ID.api_gateway.x0 + 10)).toBeGreaterThanOrEqual(2);
-    expect(ROOM_BY_ID.service_payments.y0 - (ROOM_BY_ID.api_gateway.y0 + 8)).toBeGreaterThanOrEqual(2);
-  });
-  it('defines all 17 physical connections as door pairs', () => {
-    expect(CONNECTIONS).toHaveLength(17);
-    for (const c of CONNECTIONS) {
-      const a = ROOM_BY_ID[c.from], b = ROOM_BY_ID[c.to];
-      expect(a.doors.some((d) => d.toward === c.to)).toBe(true);
-      expect(b.doors.some((d) => d.toward === c.from)).toBe(true);
+  it('is irregular: rooms differ in size, never overlap or touch, and sit in four wings around the atrium', () => {
+    expect(new Set(ROOMS.map((r) => `${r.w}x${r.h}`)).size).toBeGreaterThanOrEqual(6);
+    for (const a of ROOMS) for (const b of ROOMS) if (a.id < b.id) {
+      const apart = a.x0 + a.w < b.x0 || b.x0 + b.w < a.x0 || a.y0 + a.h < b.y0 || b.y0 + b.h < a.y0;
+      expect(apart, `${a.id} and ${b.id} must not touch`).toBe(true);
     }
-    for (const r of ROOMS) expect(r.doors.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(ROOMS.map((r) => r.wing))).toEqual(new Set(['atrium', 'data', 'finance', 'payments', 'collections']));
+    const wingOf = (id: RoomId) => ROOM_BY_ID[id].wing;
+    expect(['api_gateway', 'event_stream', 'fabric_platform', 'audit_gallery'].map((i) => wingOf(i as RoomId))).toEqual(['data', 'data', 'data', 'data']);
+    expect(['finance_core', 'service_payments'].map((i) => wingOf(i as RoomId))).toEqual(['finance', 'finance']);
+    expect(['payment_orchestration', 'card_payments', 'bacs_vault'].map((i) => wingOf(i as RoomId))).toEqual(['payments', 'payments', 'payments']);
+    expect(['debt_recovery', 'agency_handoff', 'payroll_pensions'].map((i) => wingOf(i as RoomId))).toEqual(['collections', 'collections', 'collections']);
+  });
+  it('lists every link with real endpoints, stable door ids and doors on room ends only', () => {
+    const ids = new Set([...ROOMS.map((r) => r.id as string), ...LAYOUT_JUNCTIONS.map((j) => j.id)]);
+    expect(new Set(LINKS.map((l) => l.id)).size).toBe(LINKS.length);
+    for (const l of LINKS) {
+      expect(ids.has(l.a) && ids.has(l.b), l.id).toBe(true);
+      for (const [end, spec, other] of [[l.a, l.da, l.b], [l.b, l.db, l.a]] as const) {
+        if (ROOM_BY_ID[end as RoomId]) { expect(spec, `${l.id} door at ${end}`).toBeDefined(); const d = DOOR_BY_ID[`door:${end}.${other}`]; expect(d, `door:${end}.${other}`).toBeDefined(); expect(d.link).toBe(l.id); }
+        else expect(spec).toBeUndefined();
+      }
+    }
+    for (const r of ROOMS) expect(r.doors.length).toBeGreaterThanOrEqual(2);
+  });
+  it('the walkable grid joins exactly the nodes the graph says it joins (corridors are explicit, never inferred)', () => {
+    // flood-fill every connected patch of corridor cells and list the rooms whose door cells touch it
+    const comp = new Map<string, number>(); let n = 0;
+    for (let y = 0; y < GRID.h; y++) for (let x = 0; x < GRID.w; x++) {
+      if (GRID.kind[y][x] !== 'corridor' || comp.has(cellKey(x, y))) continue;
+      const q = [[x, y]]; comp.set(cellKey(x, y), n);
+      while (q.length) { const [cx, cy] = q.pop()!; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = cellKey(cx + dx, cy + dy); if (GRID.kind[cy + dy]?.[cx + dx] === 'corridor' && !comp.has(k)) { comp.set(k, n); q.push([cx + dx, cy + dy]); } } }
+      n++;
+    }
+    for (const l of LINKS) for (const e of [l.a, l.b]) { const j = LAYOUT_JUNCTIONS.find((q) => q.id === e); if (j) expect(comp.get(cellKey(j.x, j.y)), `${l.id} must open onto the ${e} plaza`).toBe(comp.get(cellKey(l.corridor[0].x, l.corridor[0].y))); }
+    const gridRooms = new Map<number, Set<string>>(), graphRooms = new Map<number, Set<string>>();
+    const add = (m: Map<number, Set<string>>, c: number, r: string) => { (m.get(c) ?? m.set(c, new Set()).get(c)!).add(r); };
+    for (const d of DOORS) for (const c of d.cells) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = cellKey(c.x + dx, c.y + dy); if (comp.has(k)) add(gridRooms, comp.get(k)!, d.room); }
+    for (const l of LINKS) {
+      const cells = l.corridor.length ? [l.corridor[0].x, l.corridor[0].y] : null; expect(cells, `${l.id} has corridor cells`).not.toBeNull();
+      const c = comp.get(cellKey(cells![0], cells![1]))!;
+      for (const e of [l.a, l.b]) if (ROOM_BY_ID[e as RoomId]) add(graphRooms, c, e);
+    }
+    expect(gridRooms.size).toBe(graphRooms.size);
+    for (const [c, rooms] of graphRooms) expect([...(gridRooms.get(c) ?? [])].sort(), `patch ${c}`).toEqual([...rooms].sort());
+  });
+  it('has a central atrium with at least three exits, the spawn, the incident wall and the Identity & Access Desk', () => {
+    const a = ROOM_BY_ID.secure_ops;
+    expect(new Set(a.doors.map((d) => d.link)).size).toBeGreaterThanOrEqual(3);
+    for (const k of ['incident_wall', 'identity_desk', 'map_table', 'access_desk']) expect(a.props.find((p) => p.key === k), k).toBeDefined();
+    const cx = a.x0 + a.w / 2, cy = a.y0 + a.h / 2;
+    for (const r of ROOMS) if (r.id !== 'secure_ops') { const d = Math.hypot(r.x0 + r.w / 2 - cx, r.y0 + r.h / 2 - cy); expect(d, r.id).toBeGreaterThan(8); }
+    expect(Math.abs(cx - GRID.w / 2)).toBeLessThan(GRID.w * 0.15);          // roughly central in the world
+    expect(MISSIONS.every((m) => m.startRoom === 'secure_ops')).toBe(true);
+  });
+  it('decorative things (entrance gate, external docks) stand on open ground, not on rooms or corridors', () => {
+    for (let x = ENTRANCE.x; x < ENTRANCE.x + ENTRANCE.w; x++) for (let y = ENTRANCE.y - 1; y <= ENTRANCE.y; y++) expect(GRID.kind[y][x], `entrance ${x},${y}`).toBe('void');
+    for (const e of EXTERNALS) for (let y = e.y; y < e.y + e.h; y++) for (let x = e.x; x < e.x + e.w; x++) expect(GRID.kind[y][x], `${e.id} ${x},${y}`).toBe('void');
   });
   it('every restricted room door has a reader and a required pass from the access map', () => {
     for (const r of ROOMS) { expect(PASS_BY_ROOM[r.id]).toBeDefined(); expect(PASSES[PASS_BY_ROOM[r.id]].room).toBe(r.id); for (const d of r.doors) expect(GRID.kind[d.readerCell.y][d.readerCell.x]).toBe('wall'); }
     expect(PASS_BY_ROOM.secure_ops).toBe('ops_pass'); expect(PASS_BY_ROOM.card_payments).toBe('payments_audit_pass'); expect(PASS_BY_ROOM.fabric_platform).toBe('fabric_observer_pass');
   });
-  it('locked rooms never block corridor travel: every room door is reachable through corridors with only ops_pass', () => {
+  it('locked rooms never block corridor travel: every door that opens onto a concourse is reachable with only the ops pass', () => {
     const walk = walkableFor(NO_ROOM_PASSES);
-    const start = { x: ROOM_BY_ID.secure_ops.x0 + 5, y: ROOM_BY_ID.secure_ops.y0 + 4 };
+    const a = ROOM_BY_ID.secure_ops, start = nearestWalkable(walk, a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
     for (const r of ROOMS) for (const d of r.doors) {
+      if (LINK_BY_ID[d.link].kind === 'maintenance' || ROOM_BY_ID[d.toward as RoomId]) continue;     // direct room-to-room links are loops: walking them means crossing a room
       const out = d.side === 'n' ? { x: d.cells[0].x, y: d.cells[0].y - 1 } : d.side === 's' ? { x: d.cells[0].x, y: d.cells[0].y + 1 } : d.side === 'w' ? { x: d.cells[0].x - 1, y: d.cells[0].y } : { x: d.cells[0].x + 1, y: d.cells[0].y };
-      expect(findPath(walk, start, out), `${r.id} ${d.side}`).not.toBeNull();
+      expect(findPath(walk, start, out, 9000), `${r.id} -> ${d.toward}`).not.toBeNull();
     }
+    for (const r of ROOMS) expect(r.doors.some((d) => !ROOM_BY_ID[d.toward as RoomId] && LINK_BY_ID[d.link].kind === 'main'), `${r.id} has a concourse door`).toBe(true);
   });
   it('cannot enter a locked room, but can with its pass', () => {
-    const card = ROOM_BY_ID.card_payments, inside = { x: card.x0 + 5, y: card.y0 + 4 };
-    const start = { x: ROOM_BY_ID.secure_ops.x0 + 5, y: ROOM_BY_ID.secure_ops.y0 + 4 };
-    expect(findPath(walkableFor(NO_ROOM_PASSES), start, inside)).toBeNull();
-    expect(findPath(walkableFor(new Set<PassId>(['ops_pass', 'payments_audit_pass'])), start, inside)).not.toBeNull();
+    const card = ROOM_BY_ID.card_payments, inside = nearestWalkable(walkableFor(ALL_PASSES), card.x0 + card.w / 2, card.y0 + card.h / 2, 4)!;
+    const a = ROOM_BY_ID.secure_ops, start = nearestWalkable(walkableFor(NO_ROOM_PASSES), a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
+    expect(findPath(walkableFor(NO_ROOM_PASSES), start, inside, 9000)).toBeNull();
+    expect(findPath(walkableFor(new Set<PassId>(['ops_pass', 'payments_audit_pass'])), start, inside, 9000)).not.toBeNull();
     for (const d of card.doors) for (const c of d.cells) expect(isWalkable(c.x, c.y, NO_ROOM_PASSES)).toBe(false);
   });
   it('props block movement and the whole map is reachable with every pass', () => {
     for (const r of ROOMS) for (const p of r.props) if (p.blocks) expect(isWalkable(p.gx, p.gy, ALL_PASSES)).toBe(false);
     const walk = walkableFor(ALL_PASSES);
-    const start = { x: ROOM_BY_ID.secure_ops.x0 + 5, y: ROOM_BY_ID.secure_ops.y0 + 4 };
-    for (const r of ROOMS) expect(findPath(walk, start, { x: r.x0 + 5, y: r.y0 + 4 }), r.id).not.toBeNull();
+    const a = ROOM_BY_ID.secure_ops, start = nearestWalkable(walk, a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
+    for (const r of ROOMS) expect(findPath(walk, start, nearestWalkable(walk, r.x0 + r.w / 2, r.y0 + r.h / 2, 4)!, 9000), r.id).not.toBeNull();
   });
   it('every interactive prop has a walkable neighbour so it can be reached', () => {
     const walk = walkableFor(ALL_PASSES);
@@ -482,19 +531,23 @@ describe('teammates and JEV (confidence-gated routing)', () => {
 // ---------------------------------------------------------------- facility graph (single source of truth) ----
 import { EQUIPMENT, EQUIPMENT_SPEC, GRAPH_ROOMS, CORRIDORS, DIAGRAMS, PORTS, layoutDiagram, incidentLink, placementOf } from '../src/data/facilityGraph';
 describe('facility graph', () => {
-  it('lists the 12 rooms at their grid positions with the specified IDs, names and codes', () => {
-    const want: Record<string, [string, string, number, number]> = { api_gateway: ['A1', 'API Gateway', 0, 0], event_stream: ['B1', 'Event Stream Hall', 1, 0], fabric_platform: ['C1', 'Fabric Data Platform', 2, 0], integration_exchange: ['D1', 'Integration Exchange', 3, 0], service_payments: ['A2', 'Service Payments', 0, 1], finance_core: ['B2', 'Finance Core', 1, 1], payment_orchestration: ['C2', 'Payment Orchestration', 2, 1], bacs_vault: ['D2', 'BACS Vault', 3, 1], secure_ops: ['A3', 'Secure Ops Control', 0, 2], card_payments: ['B3', 'Card Payments', 1, 2], debt_recovery: ['C3', 'Accounts Receivable & Debt Recovery', 2, 2], agency_handoff: ['D3', 'Agency Hand-off', 3, 2] };
-    expect(GRAPH_ROOMS.length).toBe(12);
-    for (const r of GRAPH_ROOMS) { const w = want[r.id]; expect(w, r.id).toBeDefined(); expect([r.code, r.col, r.row]).toEqual([w[0], w[2], w[3]]); expect(r.name.replace('Accounts Receivable and Debt Recovery', 'Accounts Receivable & Debt Recovery')).toBe(w[1]); }
+  it('lists the 12 core rooms with the specified IDs, names and codes, and every room has a wing', () => {
+    const want: Record<string, [string, string]> = { api_gateway: ['A1', 'API Gateway'], event_stream: ['B1', 'Event Stream Hall'], fabric_platform: ['C1', 'Fabric Data Platform'], integration_exchange: ['D1', 'Integration Exchange'], service_payments: ['A2', 'Service Payments'], finance_core: ['B2', 'Finance Core'], payment_orchestration: ['C2', 'Payment Orchestration'], bacs_vault: ['D2', 'BACS Vault'], secure_ops: ['A3', 'Secure Operations Atrium'], card_payments: ['B3', 'Card Payments'], debt_recovery: ['C3', 'Accounts Receivable & Debt Recovery'], agency_handoff: ['D3', 'Agency Hand-off'] };
+    expect(GRAPH_ROOMS.length).toBe(14);
+    for (const [id, w] of Object.entries(want)) { const r = GRAPH_ROOMS.find((q) => q.id === id)!; expect([r.code, r.name]).toEqual(w); }
+    for (const r of GRAPH_ROOMS) expect(r.wing).toBeDefined();
   });
   it('places every listed piece of equipment in its room at the requested spot', () => {
     expect(EQUIPMENT.length).toBe(EQUIPMENT_SPEC.length);
     for (const e of EQUIPMENT) expect(e.ok, `${e.room}: ${e.label} wants ${e.wanted.join('+')}, is at ${e.placement.join('+')} (${e.local.x},${e.local.y})`).toBe(true);
     expect(placementOf(5, 4)).toEqual(['centre']);
   });
-  it('has 17 corridors between rooms, all outside the room footprints', () => {
-    expect(CORRIDORS.length).toBe(17);
-    for (const c of CORRIDORS) for (const r of GRAPH_ROOMS) { const hit = c.x < r.x0 + r.w && c.x + c.w > r.x0 && c.y < r.y0 + r.h && c.y + c.h > r.y0; expect(hit, `${c.from}-${c.to} overlaps ${r.id}`).toBe(false); }
+  it('has one corridor per link, all outside the room footprints, with the door ids the map uses', () => {
+    expect(CORRIDORS.length).toBe(LINKS.length);
+    for (const c of CORRIDORS) {
+      for (const r of c.rects) for (const room of GRAPH_ROOMS) { const hit = r.x < room.x0 + room.w && r.x + r.w > room.x0 && r.y < room.y0 + room.h && r.y + r.h > room.y0; expect(hit, `${c.id} overlaps ${room.id}`).toBe(false); }
+      for (const d of c.doors) expect(DOOR_BY_ID[d], d).toBeDefined();
+    }
   });
   it('builds each diagram from route data: finance flow follows the specified chain, and returning routes run back', () => {
     const fin = layoutDiagram(DIAGRAMS[0]);
@@ -842,5 +895,110 @@ describe('avatars: local generator with a built-in fallback', async () => {
   });
   it('falls back to a monogram badge when there is no seed', () => {
     expect(avatarSvg('', 'Marisol Vance')).toBe(monogram('Marisol Vance')); expect(monogram('Marisol Vance')).toContain('>MV<'); expect(monogram('')).toContain('>?<');
+  });
+});
+
+// ---------------------------------------------------------------- facility graph: loops, shortcuts, door states, fog ----
+import { CORRIDORS as CORR, LOOPS, linkBetween, loopLinks, neighbours, nodeRoute, locate } from '../src/data/facilityGraph';
+import { isKnown, knownRooms } from '../src/game/systems/Fog';
+
+describe('facility graph: loops, cross-links and optional shortcuts', () => {
+  const ALL_NODES = [...ROOMS.map((r) => r.id as string), ...LAYOUT_JUNCTIONS.map((j) => j.id)];
+  const connected = (skip: ReadonlySet<string>) => {
+    const seen = new Set<string>(['secure_ops']), q = ['secure_ops'];
+    while (q.length) { const c = q.pop()!; for (const n of neighbours(c)) if (!skip.has(n.link) && !seen.has(n.node)) { seen.add(n.node); q.push(n.node); } }
+    return ALL_NODES.every((n) => seen.has(n));
+  };
+  it('defines the five required loops, each a real cycle of corridors', () => {
+    expect(LOOPS.map((l) => l.id)).toEqual(['operations', 'data', 'payment', 'collections', 'staff']);
+    for (const l of LOOPS) { expect(l.nodes.length, l.id).toBeGreaterThanOrEqual(3); expect(loopLinks(l).every(Boolean), `${l.id} links: ${loopLinks(l).join(',')}`).toBe(true); expect(new Set(loopLinks(l)).size).toBe(l.nodes.length); }
+  });
+  it('the Data loop closes through the Event Stream to API Gateway cross-link, which is an optional maintenance corridor', () => {
+    const cross = linkBetween('event_stream', 'api_gateway');
+    expect(cross).not.toBeNull(); expect(LINK_BY_ID[cross!].kind).toBe('maintenance');
+    expect(loopLinks(LOOPS.find((l) => l.id === 'data')!)).toContain(cross);
+    expect(ROOM_BY_ID.event_stream.doors.some((d) => d.toward === 'api_gateway')).toBe(true);
+  });
+  it('has a few optional maintenance corridors, some starting locked (pass), disabled (window) or sealable (incident)', () => {
+    const m = CORR.filter((c) => c.kind === 'maintenance');
+    expect(m.length).toBeGreaterThanOrEqual(3); expect(m.length).toBeLessThanOrEqual(5);
+    for (const c of m) expect(LINK_RULES[c.id], c.id).toBeDefined();
+    expect(m.some((c) => LINK_RULES[c.id].lock)).toBe(true); expect(m.some((c) => LINK_RULES[c.id].disabled)).toBe(true); expect(m.some((c) => LINK_RULES[c.id].sealWhen)).toBe(true);
+    for (const c of CORR.filter((x) => x.kind === 'main')) expect(LINK_RULES[c.id], `${c.id} is a main corridor, never gated`).toBeUndefined();
+  });
+  it('is bridgeless: the facility stays connected if any single main corridor is lost', () => {
+    expect(connected(new Set())).toBe(true);
+    for (const c of CORR) if (c.kind === 'main') { const ok = connected(new Set([c.id])); if (!ok) { const isConcourseLeaf = c.from !== c.to && (neighbours(c.from).length === 1 || neighbours(c.to).length === 1); expect(isConcourseLeaf, `losing ${c.id} must not split the facility`).toBe(false); } }
+  });
+  it('every room is reachable from the atrium over main corridors and open ground, walking through no other room', () => {
+    for (const r of ROOMS) expect(nodeRoute('secure_ops', r.id, { maintenance: false, transit: (x) => x === 'secure_ops' }), r.id).not.toBeNull();
+  });
+  it('blocking every optional corridor (sealed, disabled or locked) never leaves a room or a mission objective unreachable', () => {
+    const blocked = new Set(CORR.filter((c) => c.kind === 'maintenance').map((c) => c.id));
+    for (const r of ROOMS) expect(nodeRoute('secure_ops', r.id, { blocked, transit: (x) => x === 'secure_ops' }), r.id).not.toBeNull();
+    for (const m of MISSIONS) for (const room of new Set<RoomId>([m.startRoom, m.alert.points, ...m.evidence.map((e) => e.sourceRoom)])) expect(nodeRoute('secure_ops', room, { blocked, transit: (x) => x === 'secure_ops' }), `${m.title}: ${room}`).not.toBeNull();
+  });
+  it('locates a point as a room, a concourse or the nearer end of a corridor', () => {
+    const a = ROOM_BY_ID.secure_ops; expect(locate(a.x0 + 3, a.y0 + 3)).toBe('secure_ops');
+    const j = LAYOUT_JUNCTIONS[0]; expect(locate(j.x + 1, j.y + 1)).toBe(j.id);
+    expect(locate(0, 0)).toBeNull();
+  });
+});
+
+describe('door states: open, locked, incident-sealed and temporarily disabled, each with a reason', () => {
+  const reset = () => { GATE.minutes = 99; GATE.sealed.clear(); };
+  const door = (a: string, b: string) => DOOR_BY_ID[`door:${a}.${b}`];
+  it('a room door is locked until its pass is held, and says which pass', () => {
+    reset();
+    const d = ROOM_BY_ID.card_payments.doors[0], none = new Set<string>(['ops_pass']);
+    const i = doorInfo(d, none); expect(i.status).toBe('locked'); expect(i.need).toBe('payments_audit_pass'); expect(i.reason).toMatch(/Payments Audit Pass/);
+    expect(doorInfo(d, new Set(['ops_pass', 'payments_audit_pass'])).status).toBe('open');
+  });
+  it('the conduit shortcut starts locked until the Maintenance Pass', () => {
+    reset();
+    const d = door('event_stream', 'api_gateway'), pass = new Set<string>(['ops_pass', 'event_trace_pass']);
+    expect(doorInfo(d, pass)).toMatchObject({ status: 'locked', need: 'maintenance_pass' });
+    expect(doorInfo(d, new Set([...pass, 'maintenance_pass'])).status).toBe('open');
+    // and the corridor itself blocks walkers without the pass, even though the door's own room is open
+    const c = LINK_BY_ID['es-api'].corridor[0]; expect(isWalkable(c.x, c.y, pass)).toBe(false); expect(isWalkable(c.x, c.y, new Set([...pass, 'maintenance_pass']))).toBe(true);
+  });
+  it('the back-office shortcut is temporarily disabled for maintenance, then comes back by itself', () => {
+    reset(); GATE.minutes = 1;
+    const d = door('service_payments', 'card_payments'), pass = new Set<string>(['ops_pass', 'service_audit_pass']);
+    const i = doorInfo(d, pass); expect(i.status).toBe('disabled'); expect(i.reason).toMatch(/Temporarily disabled/);
+    GATE.minutes = 7; expect(doorInfo(d, pass).status).toBe('open');
+    reset();
+  });
+  it('an uncontained incident seals the optional corridors beside its room, and containing it reopens them', () => {
+    reset();
+    const m = MISSIONS.find((x) => x.alert.points === 'card_payments')!;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    expect(GATE.sealed.has('sp-card')).toBe(true);
+    const d = door('card_payments', 'service_payments'), pass = new Set<string>(['ops_pass', 'payments_audit_pass']);
+    s.elapsed = 100; run.syncGate(); expect(GATE.minutes).toBeGreaterThan(6);
+    expect(doorInfo(d, pass)).toMatchObject({ status: 'sealed' }); expect(doorInfo(d, pass).reason).toMatch(/incident/i);
+    s.contained['route:receipt_event_feed'] = { rerouted: false, since: 0 }; run.syncGate();
+    expect(GATE.sealed.has('sp-card')).toBe(false); expect(doorInfo(d, pass).status).toBe('open');
+    reset();
+  });
+  it('a sealed door is not walkable and a sealed corridor blocks walking', () => {
+    reset(); GATE.sealed.add('ix-agency');
+    const pass = new Set<string>(['ops_pass', 'integration_audit_pass', 'agency_audit_pass', 'courier_pass']);
+    const c = LINK_BY_ID['ix-agency'].corridor[0]; expect(isWalkable(c.x, c.y, pass)).toBe(false);
+    for (const dc of door('agency_handoff', 'integration_exchange').cells) expect(isWalkable(dc.x, dc.y, pass)).toBe(false);
+    reset(); expect(isWalkable(c.x, c.y, pass)).toBe(true);
+  });
+  it('linkInfo reports the same state the door shows', () => {
+    reset(); expect(linkInfo('es-api', new Set(['ops_pass'])).status).toBe('locked'); expect(linkInfo('a-jn', new Set(['ops_pass'])).status).toBe('open');
+  });
+});
+
+describe('fog of discovery: visited rooms are revealed, the rest are silhouettes', () => {
+  it('reveals the start room and the incident room, then rooms as they are visited', () => {
+    const m = MISSIONS[0], s = new GameState(m); new MissionRunner(s).start();
+    expect(isKnown(s, m.startRoom)).toBe(true); expect(isKnown(s, m.alert.points)).toBe(true);
+    const hidden = ROOMS.find((r) => !isKnown(s, r.id))!; expect(hidden).toBeDefined();
+    expect(knownRooms(s).length).toBeLessThan(ROOMS.length);
+    s.setFlag('visited_' + hidden.id); expect(isKnown(s, hidden.id)).toBe(true);
   });
 });

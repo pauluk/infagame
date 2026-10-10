@@ -1,4 +1,6 @@
-import { CONNECTIONS, EXTERNALS, EXTERNAL_BY_ID, FAC_H, FAC_W, FAC_X0, FAC_Y0, ROOMS, ROOM_BY_ID, ENTRANCE } from './map';
+import { DOORS, GRID, JUNCTION_BY_ID, NODE_BY_ID, NODES, isRoomNode, EXTERNALS, EXTERNAL_BY_ID, FAC_H, FAC_W, FAC_X0, FAC_Y0, LINKS, LINK_RULES, ROOMS, ROOM_BY_ID, ENTRANCE } from './map';
+import { LAYOUT_ROOMS } from './layout';
+import { BAYS, WING_NAMES, type BayDef, type Wing } from './rooms';
 import { ROUTES, ROUTE_BY_ID, routePoints, routeRooms } from './routes';
 import { PASSES } from './passes';
 import type { DoorDef, PropDef, RoomId, RouteDef, RouteType, Side } from '../game/types';
@@ -42,7 +44,8 @@ export const EQUIPMENT_SPEC: EquipmentSpec[] = [
 export interface Equipment { id: string; room: RoomId; label: string; prop: PropDef; local: { x: number; y: number }; placement: Placement[]; wanted: Placement[]; ok: boolean }
 export const EQUIPMENT: Equipment[] = EQUIPMENT_SPEC.map((e) => {
   const room = ROOM_BY_ID[e.room], prop = room.props.find((p) => p.key === e.key)!;
-  const local = { x: prop.gx - room.x0, y: prop.gy - room.y0 }, placement = placementOf(local.x, local.y);
+  const lr = LAYOUT_ROOMS.find((q) => q.id === e.room)!;
+  const local = { x: prop.gx - room.x0 - lr.ox, y: prop.gy - room.y0 - lr.oy }, placement = placementOf(local.x, local.y);
   return { id: prop.id, room: e.room, label: e.label, prop, local, placement, wanted: e.want, ok: e.want.every((w) => placement.includes(w)) };
 });
 export const EQUIPMENT_BY_ID = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]));
@@ -51,10 +54,15 @@ export const EQUIPMENT_BY_ID = Object.fromEntries(EQUIPMENT.map((e) => [e.id, e]
 export interface Port { id: string; room: RoomId; side: Side; label: string; routeIds: string[]; door?: string }
 const sideOf = (room: RoomId, toward: string): Side => {
   const a = ROOM_BY_ID[room], b = ROOM_BY_ID[toward as RoomId];
-  if (b) return b.col > a.col ? 'e' : b.col < a.col ? 'w' : b.row > a.row ? 's' : 'n';
-  const x = EXTERNAL_BY_ID[toward]; const cx = FAC_X0 + FAC_W / 2, cy = FAC_Y0 + FAC_H / 2;
-  if (!x) return 'n';
-  return x.x > FAC_X0 + FAC_W ? 'e' : x.y < FAC_Y0 ? 'n' : x.y > FAC_Y0 + FAC_H ? 's' : x.x < cx ? 'w' : cy > x.y ? 'n' : 's';
+  if (b) {
+    const link = a.doors.find((d) => d.toward === b.id);
+    if (link) return link.side;                      // a real door faces that neighbour
+    const dx = b.x0 + b.w / 2 - (a.x0 + a.w / 2), dy = b.y0 + b.h / 2 - (a.y0 + a.h / 2);
+    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'e' : 'w') : (dy > 0 ? 's' : 'n');
+  }
+  const x = EXTERNAL_BY_ID[toward]; if (!x) return 'n';
+  const dx = x.x + x.w / 2 - (a.x0 + a.w / 2), dy = x.y + x.h / 2 - (a.y0 + a.h / 2);
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'e' : 'w') : (dy > 0 ? 's' : 'n');
 };
 /** One port per (room, direction) that a route uses, labelled with where the data goes. Derived from the routes, never typed twice. */
 export const PORTS: Port[] = (() => {
@@ -67,7 +75,7 @@ export const PORTS: Port[] = (() => {
         if (!nb) continue;
         const room = h as RoomId, side = sideOf(room, nb), id = `port:${room}.${side}.${nb}`;
         const label = `${dir === 'from' ? 'In from' : 'Out to'} ${ROOM_BY_ID[nb as RoomId]?.name ?? EXTERNAL_BY_ID[nb]?.name ?? nb}`;
-        const p = map.get(id) ?? { id, room, side, label, routeIds: [], door: ROOM_BY_ID[room].doors.find((d) => d.side === side)?.id };
+        const p = map.get(id) ?? { id, room, side, label, routeIds: [], door: (ROOM_BY_ID[room].doors.find((d) => d.toward === nb) ?? ROOM_BY_ID[room].doors.find((d) => d.side === side))?.id };
         if (!p.routeIds.includes(r.id)) p.routeIds.push(r.id);
         map.set(id, p);
       }
@@ -77,19 +85,77 @@ export const PORTS: Port[] = (() => {
 })();
 
 // ---------------------------------------------------------------- rooms, corridors, doors ----
-export interface GraphRoom { id: RoomId; code: string; name: string; col: number; row: number; x0: number; y0: number; w: number; h: number; pass: string; passName: string; doors: DoorDef[]; equipment: Equipment[]; ports: Port[]; routeIds: string[] }
+export interface GraphRoom { id: RoomId; code: string; name: string; wing: Wing; bays: BayDef[]; x0: number; y0: number; w: number; h: number; pass: string; passName: string; doors: DoorDef[]; equipment: Equipment[]; ports: Port[]; routeIds: string[] }
 export const GRAPH_ROOMS: GraphRoom[] = ROOMS.map((r) => ({
-  id: r.id, code: r.code, name: r.name, col: r.col, row: r.row, x0: r.x0, y0: r.y0, w: r.w, h: r.h, pass: r.requiredPass, passName: PASSES[r.requiredPass].name,
+  id: r.id, code: r.code, name: r.name, wing: r.wing, bays: BAYS.filter((b) => b.room === r.id), x0: r.x0, y0: r.y0, w: r.w, h: r.h, pass: r.requiredPass, passName: PASSES[r.requiredPass].name,
   doors: r.doors, equipment: EQUIPMENT.filter((e) => e.room === r.id), ports: PORTS.filter((p) => p.room === r.id), routeIds: ROUTES.filter((q) => routeRooms(q).includes(r.id)).map((q) => q.id),
 }));
 export const GRAPH_ROOM_BY_ID = Object.fromEntries(GRAPH_ROOMS.map((r) => [r.id, r])) as Record<RoomId, GraphRoom>;
 
-export interface Corridor { from: RoomId; to: RoomId; axis: 'ew' | 'ns'; /** grid rectangle of the corridor between the two rooms */ x: number; y: number; w: number; h: number }
-export const CORRIDORS: Corridor[] = CONNECTIONS.map((c) => {
-  const a = ROOM_BY_ID[c.from], b = ROOM_BY_ID[c.to];
-  return c.axis === 'ew' ? { ...c, x: a.x0 + a.w, y: a.y0 + 3, w: b.x0 - (a.x0 + a.w), h: 2 } : { ...c, x: a.x0 + 4, y: a.y0 + a.h, w: 2, h: b.y0 - (a.y0 + a.h) };
-});
-export const FACILITY = { x0: FAC_X0, y0: FAC_Y0, w: FAC_W, h: FAC_H, entrance: ENTRANCE, cols: 4, rows: 3 };
+/** One physical corridor: an explicit link between two graph nodes (rooms or junctions). Never inferred from where rooms sit on screen. */
+export interface Corridor { id: string; from: string; to: string; kind: 'main' | 'maintenance'; label: string; rects: { x: number; y: number; w: number; h: number }[]; /** door ids at the room ends (junction ends have none) */ doors: string[] }
+export const CORRIDORS: Corridor[] = LINKS.map((l) => ({ id: l.id, from: l.a, to: l.b, kind: l.kind, label: l.label, rects: l.corridor,
+  doors: [isRoomNode(l.a) && l.da ? `door:${l.a}.${l.b}` : '', isRoomNode(l.b) && l.db ? `door:${l.b}.${l.a}` : ''].filter(Boolean) }));
+export const CORRIDOR_BY_ID = Object.fromEntries(CORRIDORS.map((c) => [c.id, c])) as Record<string, Corridor>;
+export const FACILITY = { x0: FAC_X0, y0: FAC_Y0, w: FAC_W, h: FAC_H, entrance: ENTRANCE };
+export const nodeName = (id: string) => NODE_BY_ID[id]?.name ?? id;
+export const nodeCode = (id: string) => NODE_BY_ID[id]?.code ?? '';
+
+/**
+ * The explicit graph: rooms and junctions are nodes, corridors are edges. Movement, maps, doors and markers all read this.
+ * A junction is open ground, so passing through one never needs a pass; passing through a ROOM does.
+ */
+export function neighbours(node: string, opts: { includeMaintenance?: boolean } = {}): { node: string; link: string; door: string | null }[] {
+  return CORRIDORS.filter((c) => (c.from === node || c.to === node) && (opts.includeMaintenance !== false || c.kind === 'main')).map((c) => {
+    const other = c.from === node ? c.to : c.from;
+    return { node: other, link: c.id, door: isRoomNode(node) ? `door:${node}.${other}` : null };
+  });
+}
+/**
+ * Shortest route between two nodes over corridors. `transit` says which rooms may be walked THROUGH (junctions always can):
+ * by default only the atrium. `blocked` = link ids to avoid.
+ */
+export function nodeRoute(from: string, to: string, opts: { blocked?: ReadonlySet<string>; maintenance?: boolean; transit?: (room: RoomId) => boolean } = {}): string[] | null {
+  if (from === to) return [from];
+  const blocked = opts.blocked ?? new Set<string>(), transit = opts.transit ?? ((r: RoomId) => r === 'secure_ops');
+  const prev = new Map<string, string | null>([[from, null]]), q: string[] = [from];
+  while (q.length) {
+    const cur = q.shift()!;
+    if (cur !== from && isRoomNode(cur) && !transit(cur)) continue;               // a locked room is a dead end, not a thoroughfare
+    for (const n of neighbours(cur, { includeMaintenance: opts.maintenance ?? true })) {
+      if (blocked.has(n.link) || prev.has(n.node)) continue;
+      prev.set(n.node, cur);
+      if (n.node === to) { const out: string[] = []; for (let c: string | null = to; c; c = prev.get(c) ?? null) out.unshift(c); return out; }
+      q.push(n.node);
+    }
+  }
+  return null;
+}
+/** The required loops: cycles of nodes (each consecutive pair, and last to first, is a corridor). The Data loop closes through the maintenance cross-link. */
+export interface LoopDef { id: string; name: string; nodes: string[]; note: string }
+export const LOOPS: LoopDef[] = [
+  { id: 'operations', name: 'Operations loop', nodes: ['secure_ops', 'jw', 'finance_core', 'jnw', 'event_stream', 'fabric_platform', 'jn'], note: 'Atrium, Finance Core, Event Stream and Fabric Platform around the control ring.' },
+  { id: 'data', name: 'Data loop', nodes: ['event_stream', 'fabric_platform', 'api_gateway'], note: 'Event Stream, Fabric Platform and API Gateway; it closes through the Event Stream to API Gateway maintenance conduit (the cross-link).' },
+  { id: 'payment', name: 'Payment loop', nodes: ['secure_ops', 'js', 'card_payments', 'bacs_vault', 'jse', 'payment_orchestration', 'je'], note: 'Atrium, Card Payments, BACS Vault and Payment Orchestration.' },
+  { id: 'collections', name: 'Collections loop', nodes: ['payment_orchestration', 'jne', 'agency_handoff', 'debt_recovery', 'bacs_vault', 'jse'], note: 'Payment Orchestration, Agency Hand-off, Debt Recovery and the BACS Vault.' },
+  { id: 'staff', name: 'Staff access loop', nodes: ['secure_ops', 'jsw', 'payroll_pensions', 'service_payments', 'finance_core', 'jw'], note: 'Atrium, Payroll & Pensions, Service Payments and Finance Core.' },
+];
+export const loopRooms = (l: LoopDef): RoomId[] => l.nodes.filter(isRoomNode) as RoomId[];
+export const linkBetween = (a: string, b: string): string | null => CORRIDORS.find((c) => (c.from === a && c.to === b) || (c.from === b && c.to === a))?.id ?? null;
+export const loopLinks = (l: LoopDef): string[] => l.nodes.map((n, i) => linkBetween(n, l.nodes[(i + 1) % l.nodes.length]) ?? '');
+/** Which graph node a grid point is in: a room, a junction plaza, or (in a corridor) the nearer end of that corridor. */
+export function locate(x: number, y: number): string | null {
+  const cx = Math.floor(x), cy = Math.floor(y), k = `${cx},${cy}`;
+  const room = GRID.roomOf[cy]?.[cx]; if (room) return room;
+  const j = GRID.junctionOf.get(k); if (j) return j;
+  const l = GRID.linkOf.get(k); if (!l) return null;
+  const c = CORRIDOR_BY_ID[l], at = (id: string): [number, number] => { const r = ROOM_BY_ID[id as RoomId]; if (r) return [r.x0 + r.w / 2, r.y0 + r.h / 2]; const q = JUNCTION_BY_ID[id]; return [q.x + q.w / 2, q.y + q.h / 2]; };
+  const da = Math.hypot(at(c.from)[0] - x, at(c.from)[1] - y), db = Math.hypot(at(c.to)[0] - x, at(c.to)[1] - y);
+  return da <= db ? c.from : c.to;
+}
+export const nodeCentre = (id: string): [number, number] => { const r = ROOM_BY_ID[id as RoomId]; if (r) return [r.x0 + r.w / 2, r.y0 + r.h / 2]; const q = JUNCTION_BY_ID[id]; return [q.x + q.w / 2, q.y + q.h / 2]; };
+export const WING_LABEL = WING_NAMES;
+export { BAYS, DOORS, LINK_RULES, NODES };
 
 // ---------------------------------------------------------------- nodes and edges for the system diagrams ----
 export type NodeKind = 'room' | 'external' | 'station';
@@ -103,21 +169,16 @@ export interface GraphEdge { route: RouteDef; from: string; to: string; index: n
 export const EDGES: GraphEdge[] = ROUTES.flatMap((r) => r.hops.slice(1).map((h, i) => ({ route: r, from: r.hops[i], to: h, index: i })));
 export const isReturning = (t: RouteType) => t === 'return' || t === 'agency_return';
 
-export interface DiagramView { id: 'finance' | 'carddebt' | 'events' | 'access'; label: string; title: string; routeIds: string[]; note: string }
+export interface DiagramView { id: 'finance' | 'carddebt' | 'events'; label: string; title: string; routeIds: string[]; note: string }
 export const DIAGRAMS: DiagramView[] = [
   { id: 'finance', label: 'Finance Flows', title: 'Finance payment flow', routeIds: ['service_payment_intake', 'supplier_payment_release', 'bank_response_reconciliation'], note: 'Requests enter through the API Gateway, are posted in Finance Core, released through Payment Orchestration and the BACS Vault to the simulated bank. Bank acknowledgements return the same way for reconciliation.' },
   { id: 'carddebt', label: 'Debt & Card', title: 'Card and debt flow', routeIds: ['card_receipt', 'debt_agency_export', 'agency_receipt'], note: 'Simulated card payments settle in Card Payments and post through Accounts Receivable. Approved debt exports leave through the Integration Exchange to the fictional agency; receipts come back the same approved way.' },
   { id: 'events', label: 'Events & Fabric', title: 'Events and analytics lineage', routeIds: ['finance_event_mirror', 'receipt_event_feed'], note: 'Finance modules and payment routes publish events to the Event Stream Hall, then Fabric lands them in Bronze, cleans them in Silver, publishes Gold, and feeds the reporting dashboard. Everything on this view is simulated while Demo data is on.' },
-  { id: 'access', label: 'Access & Incidents', title: 'Access and incident map', routeIds: ROUTES.map((r) => r.id), note: 'Physical corridors and doors (solid grey) are shown with every data route on top. A data route is not a corridor: it never blocks movement and is not a door.' },
 ];
 
 /** Layered layout for a diagram, computed from its routes: forward routes set the columns; returning routes run back along them. */
 export function layoutDiagram(view: DiagramView): { nodes: (GraphNode & { col: number; row: number })[]; cols: number; rows: number } {
   const routes = view.routeIds.map((id) => ROUTE_BY_ID[id]);
-  if (view.id === 'access') {
-    const nodes = [...ROOMS.map((r) => ({ ...nodeOf(r.id), col: r.col + 1, row: r.row })), ...EXTERNALS.map((x) => ({ ...nodeOf(x.id), col: x.id === 'bank_sim' || x.id === 'agency_sim' ? 5 : x.id === 'card_network_sim' ? 2 : 3, row: x.id === 'bank_sim' ? 1 : x.id === 'agency_sim' ? 2 : x.id === 'card_network_sim' ? 3 : -1 }))];
-    return { nodes: nodes.map((n) => ({ ...n, row: n.row + 1 })), cols: 6, rows: 5 };
-  }
   const depth: Record<string, number> = {}, order: string[] = [];
   const fwd = routes.filter((r) => !isReturning(r.type));
   for (const r of fwd) for (const h of r.hops) if (!(h in depth)) { depth[h] = 0; order.push(h); }

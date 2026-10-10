@@ -11,7 +11,8 @@ import { CAMPAIGN_GOAL, CAMPAIGN_MISSIONS, MISSIONS, MISSION_BY_ID } from '../da
 import { BADGES, campaign } from '../game/systems/Campaign';
 import { MEASURE_KEYS, MEASURE_LABEL, confidenceWord, measuresOf, overallConfidence, type Measures } from '../game/systems/Confidence';
 import { PASSES } from '../data/passes';
-import { FAC_H, FAC_W, FAC_X0, FAC_Y0, GRID, ROOMS, ROOM_BY_ID, EXTERNAL_BY_ID, EXTERNALS } from '../data/map';
+import { DOOR_BY_ID, FAC_H, FAC_W, FAC_X0, FAC_Y0, GRID, LINKS, LINK_BY_ID, LINK_RULES, ROOMS, ROOM_BY_ID, EXTERNAL_BY_ID, EXTERNALS, doorInfo } from '../data/map';
+import { isKnown } from '../game/systems/Fog';
 import { ROUTES, ROUTE_BY_ID, STATE_LABEL, routePoints } from '../data/routes';
 import { describeTarget } from '../data/targets';
 import { app } from '../app';
@@ -553,19 +554,28 @@ export class UI {
     const ctx = cv.getContext('2d')!; const { sc, ox, oy } = this.mmGeom();
     ctx.clearRect(0, 0, 520, 400); ctx.fillStyle = PALETTE.navy; ctx.fillRect(0, 0, 520, 400);
     // corridors
-    ctx.fillStyle = '#2a4062'; ctx.fillRect(FAC_X0 * sc + ox, FAC_Y0 * sc + oy, FAC_W * sc, FAC_H * sc);
+    ctx.fillStyle = '#2a4062'; for (const l of LINKS) for (const c of l.corridor) ctx.fillRect(c.x * sc + ox, c.y * sc + oy, c.w * sc, c.h * sc);
     for (const e of EXTERNALS) { ctx.fillStyle = '#1A2B43'; ctx.strokeStyle = COLOR_HEX[e.color]; ctx.setLineDash([4, 3]); ctx.lineWidth = 2; ctx.fillRect(e.x * sc + ox, e.y * sc + oy, e.w * sc, e.h * sc); ctx.strokeRect(e.x * sc + ox, e.y * sc + oy, e.w * sc, e.h * sc); ctx.setLineDash([]); }
     // rooms
     ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const r of ROOMS) {
-      const has = st.passes.has(r.requiredPass), x = r.x0 * sc + ox, y = r.y0 * sc + oy, w = r.w * sc, h = r.h * sc;
+      const has = st.passes.has(r.requiredPass), x = r.x0 * sc + ox, y = r.y0 * sc + oy, w = r.w * sc, h = r.h * sc, known = isKnown(st, r.id);
+      if (!known) { ctx.fillStyle = '#16243b'; ctx.fillRect(x, y, w, h); ctx.lineWidth = 2; ctx.strokeStyle = '#34517f'; ctx.strokeRect(x, y, w, h); continue; }
       ctx.fillStyle = has ? 'rgba(157,227,177,0.16)' : 'rgba(11,20,36,0.75)'; ctx.fillRect(x, y, w, h);
       ctx.lineWidth = this.mmSelected === r.id ? 4 : 2; ctx.strokeStyle = this.mmSelected === r.id ? '#fff' : COLOR_HEX[r.accent]; ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = PALETTE.white; ctx.fillText(r.code, x + w / 2, y + h / 2 - 6);
-      ctx.font = '12px system-ui'; ctx.fillText(has ? '✓ open' : '🔒', x + w / 2, y + h / 2 + 11); ctx.font = 'bold 15px system-ui';
-      for (const d of r.doors) for (const c of d.cells) {
-        ctx.fillStyle = has ? PALETTE.mint : PALETTE.coral;
-        if (has) { ctx.beginPath(); ctx.arc((c.x + 0.5) * sc + ox, (c.y + 0.5) * sc + oy, 3, 0, 6.3); ctx.fill(); } else ctx.fillRect((c.x + 0.1) * sc + ox, (c.y + 0.1) * sc + oy, sc * 0.8, sc * 0.8);
+      ctx.fillStyle = PALETTE.white; ctx.font = `bold ${Math.min(15, Math.max(9, w / 5))}px system-ui`; ctx.fillText(r.code, x + w / 2, y + h / 2 - 5);
+      ctx.font = `${Math.min(12, Math.max(8, w / 6))}px system-ui`; ctx.fillText(has ? '✓ open' : '🔒', x + w / 2, y + h / 2 + 8);
+    }
+    // doors: shape as well as colour (open = circle, locked = square, sealed = diamond, disabled = hollow square)
+    for (const r of ROOMS) for (const d of r.doors) {
+      const di = doorInfo(d, st.passes).status;
+      for (const c of d.cells) {
+        const cx = (c.x + 0.5) * sc + ox, cy = (c.y + 0.5) * sc + oy, q = Math.max(2.5, sc * 0.45);
+        ctx.beginPath();
+        if (di === 'open') { ctx.fillStyle = PALETTE.mint; ctx.arc(cx, cy, q, 0, 6.3); ctx.fill(); }
+        else if (di === 'locked') { ctx.fillStyle = PALETTE.amber; ctx.fillRect(cx - q, cy - q, q * 2, q * 2); }
+        else if (di === 'sealed') { ctx.fillStyle = PALETTE.coral; ctx.moveTo(cx, cy - q * 1.3); ctx.lineTo(cx + q * 1.3, cy); ctx.lineTo(cx, cy + q * 1.3); ctx.lineTo(cx - q * 1.3, cy); ctx.fill(); }
+        else { ctx.strokeStyle = '#9fb4d6'; ctx.lineWidth = 2; ctx.strokeRect(cx - q, cy - q, q * 2, q * 2); }
       }
     }
     // incident route
@@ -589,7 +599,7 @@ export class UI {
 
   private renderPasses(): void {
     const st = this.state, box = this.hud && $(this.hud, '#passes'); if (!st || !box) return;
-    box.innerHTML = '<span class="chip" style="font-size:.7em">Passes:</span>' + Object.values(PASSES).map((p) => `<span class="chip ${st.passes.has(p.id) ? 'good' : ''}" title="${esc(p.scope)}">${st.passes.has(p.id) ? '✓' : '🔒'} ${esc(p.name.replace(' Pass', ''))}</span>`).join('');
+    box.innerHTML = '<span class="chip" style="font-size:.7em">Passes:</span>' + Object.values(PASSES).filter((p) => st.passes.has(p.id) || (p.id !== 'maintenance_pass' && p.id !== 'courier_pass')).map((p) => `<span class="chip ${st.passes.has(p.id) ? 'good' : ''}" title="${esc(p.scope)}">${st.passes.has(p.id) ? '✓' : '🔒'} ${esc(p.name.replace(' Pass', ''))}</span>`).join('');
   }
 
   // ===================================================================== log ====
@@ -715,28 +725,31 @@ export class UI {
         wrap.onclick = (e) => { if ((e.target as HTMLElement).dataset.a === 'ok') close(); };
         break;
       }
-      case 'access': this.paintAccess(wrap, d.readerRoom, close); break;
+      case 'access': this.paintAccess(wrap, d.readerRoom, close, d.door); break;
       case 'board': this.paintBoard(wrap, close); break;
     }
     if (d.type !== 'access' && d.type !== 'board') focusPrimary();
     wrap.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Escape') { e.stopPropagation(); close(); } });
   }
 
-  private paintAccess(wrap: HTMLElement, readerRoom: RoomId | undefined, close: (a?: () => void) => void): void {
+  private paintAccess(wrap: HTMLElement, readerRoom: RoomId | undefined, close: (a?: () => void) => void, doorId?: string): void {
     const st = this.state!, runner = this.runner!;
     const rows = (ids: PassId[]) => ids.map((id) => {
       const p = PASSES[id], has = st.passes.has(id);
       return `<tr><td><b>${esc(p.name)}</b><div class="small">${esc(ROOM_BY_ID[p.room].name)} · ${esc(p.scope)}</div></td><td>${has ? '<span class="chip good">✓ Issued</span>' : '<span class="chip warn">🔒 Not held</span>'}</td><td>${has ? (id === 'ops_pass' ? '' : `<button data-rev="${id}" title="Revoke access you no longer need (least privilege)">Revoke</button>`) : `<button data-req="${id}">Request</button>`}</td></tr>`;
     }).join('');
-    const ids = readerRoom ? [ROOM_BY_ID[readerRoom].requiredPass] : (Object.keys(PASSES) as PassId[]);
+    const door = doorId ? DOOR_BY_ID[doorId] : undefined, di = door ? doorInfo(door, st.passes) : null, rule = door ? LINK_RULES[door.link] : undefined;
+    const ids = readerRoom ? [ROOM_BY_ID[readerRoom].requiredPass, ...(rule?.lock ? [rule.lock] : [])] : (Object.keys(PASSES) as PassId[]);
+    const ICON = { open: '✓ Open', locked: '\u{1F512} Locked', sealed: '◆ Sealed by an incident', disabled: '⏸ Temporarily disabled' } as const;
+    const doorLine = door && di ? `<p class="doorstate ${di.status}" role="status"><b>${ICON[di.status]}</b>: ${esc(di.reason)}.${LINK_BY_ID[door.link].kind === 'maintenance' ? ' <span class="small">This is an optional maintenance shortcut: every required room can be reached the long way round.</span>' : ''}</p>` : '';
     const last = st.latestResult && (st.latestResult.title.includes('Pass') || st.latestResult.title.includes('Request') || st.latestResult.title.includes('granted')) ? `<div class="toast ${st.latestResult.tone}" style="margin:8px 0">${toneIcon(st.latestResult.tone)} <b>${esc(st.latestResult.title)}</b> ${esc(st.latestResult.text)}</div>` : '';
     wrap.innerHTML = `<div class="card wide" role="dialog" aria-modal="true"><div class="chip info">${readerRoom ? 'Door access reader' : 'Access Desk'}</div><h2 style="margin-top:6px">${readerRoom ? esc(ROOM_BY_ID[readerRoom].name) : 'Request a pass'}</h2>
-      <p class="small">Passes are fictional, read-only and expire when the mission ends. A request is approved only when current evidence justifies it. There is no bypass: if it is denied, the hint says what to find first.</p>${last}
+      ${doorLine}<p class="small">Passes are fictional, read-only and expire when the mission ends. A request is approved only when current evidence justifies it. There is no bypass: if it is denied, the hint says what to find first.</p>${last}
       <table class="t">${rows(ids)}</table><div class="row"><button class="primary" data-a="ok">Close</button></div></div>`;
     wrap.onclick = (e) => {
       const b = (e.target as HTMLElement).closest('button'); if (!b) return;
-      if (b.dataset.req) { runner.requestPass(b.dataset.req as PassId, readerRoom ? 'reader' : 'desk'); this.paintAccess(wrap, readerRoom, close); }
-      else if (b.dataset.rev) { runner.revoke(b.dataset.rev as PassId); this.paintAccess(wrap, readerRoom, close); }
+      if (b.dataset.req) { runner.requestPass(b.dataset.req as PassId, readerRoom ? 'reader' : 'desk'); this.paintAccess(wrap, readerRoom, close, doorId); }
+      else if (b.dataset.rev) { runner.revoke(b.dataset.rev as PassId); this.paintAccess(wrap, readerRoom, close, doorId); }
       else if (b.dataset.a === 'ok') close();
     };
   }

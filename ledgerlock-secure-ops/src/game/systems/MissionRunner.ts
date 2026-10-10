@@ -4,8 +4,18 @@ import { describeTarget, type TargetInfo } from '../../data/targets';
 import { TOOL_BY_ID } from '../../data/tools';
 import { PASSES } from '../../data/passes';
 import { ROUTES, routeRooms } from '../../data/routes';
-import { ROOM_BY_ID } from '../../data/map';
+import { GATE, LINK_RULES, ROOM_BY_ID } from '../../data/map';
 import type { GameState } from './GameState';
+
+/** Optional passes that no mission lists: they open exhibits or maintenance shortcuts, never a required objective. */
+const OPTIONAL_GRANTS: Partial<Record<PassId, { when: (s: GameState) => boolean; hint: string }>> = {
+  audit_gallery_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. This pass is optional, and broader than the incident needs.' },
+  staff_office_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. This pass is optional; access reviews are done at the Identity & Access Desk in the atrium.' },
+  maintenance_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. The maintenance conduits are optional shortcuts.' },
+  courier_pass: { when: (s) => !!s.flags.briefed && !GATE.sealed.has('ix-agency'), hint: 'The courier lift is sealed while an incident near the Agency Hand-off is uncontained, and needs the shift briefed first.' },
+};
+/** These open corridors only, so they never cost Data protection. */
+const CORRIDOR_ONLY: PassId[] = ['maintenance_pass', 'courier_pass'];
 
 const matches = (spec: string | string[] | ((id: string) => boolean), id: string) =>
   typeof spec === 'function' ? spec(id) : Array.isArray(spec) ? spec.includes(id) : spec === id;
@@ -25,7 +35,20 @@ export class MissionRunner {
   start(): void {
     this.m.setup?.(this.api);
     this.s.log(`Incident opened: ${this.m.alert.headline}`, 'alert');
+    this.syncGate();
     this.recompute();
+  }
+
+  /**
+   * Keeps the door-state conditions current: the game clock (temporarily disabled shortcuts) and incident seals. Only optional
+   * maintenance links can ever be sealed or disabled, so a required objective always stays reachable by the main corridors.
+   */
+  syncGate(): void {
+    const s = this.s, src = this.m.alert.points;
+    GATE.minutes = s.elapsed / 8;
+    const held = Object.keys(s.contained).length > 0 || Object.values(s.routeStates).some((v) => v === 'quarantined');
+    GATE.sealed.clear();
+    if (!s.complete && !held) for (const [id, rule] of Object.entries(LINK_RULES)) if (rule.sealWhen?.includes(src)) GATE.sealed.add(id);
   }
 
   private makeApi(): MissionApi {
@@ -91,6 +114,7 @@ export class MissionRunner {
     for (const [k, h] of Object.entries(s.hits)) if (h.until && s.elapsed >= h.until) delete s.hits[k];
     for (const [p, until] of Object.entries(s.passExpiry)) if (s.elapsed >= until) { delete s.passExpiry[p]; s.passes.delete(p as PassId); s.flags['expired_' + p] = true; s.log(`${PASSES[p as PassId].name} expired (time-limited).`, 'info'); s.emit('pass', { pass: p as PassId, granted: false }); }
     this.m.tick?.(this.api, dt);
+    this.syncGate();
     this.recompute();
     s.stats.availSum += s.availability * dt;
     s.stats.availTime += dt;
@@ -136,7 +160,7 @@ export class MissionRunner {
   requestPass(pass: PassId, via: 'desk' | 'reader'): void {
     const s = this.s, def = PASSES[pass], a = this.api;
     if (s.passes.has(pass)) return a.say('Pass already issued', `${def.name}: ${def.scope}.`, 'info');
-    const grant = this.m.passGrants[pass];
+    const grant = this.m.passGrants[pass] ?? OPTIONAL_GRANTS[pass];
     if (grant && grant.when(s)) {
       this.grant(pass, via === 'desk' ? 'Access Desk' : 'door reader');
       a.say('Pass granted', `${def.name}: ${def.scope}. It expires when this mission ends${def.minutes ? ` (or in ${def.minutes} game minutes)` : ''}.`, 'good');
@@ -160,7 +184,7 @@ export class MissionRunner {
     s.log(`Pass granted (${via}): ${def.name}. Read-only, mission-scoped, expires at debrief.`, 'good');
     s.score(`Pass: ${def.name}`, 'good');
     const need = this.m.requiredPasses;
-    if (need && !need.includes(pass) && pass !== 'ops_pass') { s.adjust('protection', -8); s.log('Data protection \u22128%: that pass was broader access than the incident needed.', 'warn'); }
+    if (need && !need.includes(pass) && pass !== 'ops_pass' && !CORRIDOR_ONLY.includes(pass)) { s.adjust('protection', -8); s.log('Data protection \u22128%: that pass was broader access than the incident needed.', 'warn'); }
     s.changed();
   }
   revoke(pass: PassId): void {
@@ -221,7 +245,7 @@ export class MissionRunner {
 
   private baseInteraction(t: TargetInfo): boolean {
     const a = this.api;
-    if (t.kind === 'reader' && t.door) { a.dialog({ type: 'access', readerRoom: t.door.room }); return true; }
+    if (t.kind === 'reader' && t.door) { a.dialog({ type: 'access', readerRoom: t.door.room, door: t.door.id }); return true; }
     if (t.id === 'prop:secure_ops.access_desk') { a.dialog({ type: 'access' }); return true; }
     if (t.id === 'prop:secure_ops.evidence_board') { a.dialog({ type: 'board' }); return true; }
     if (t.id === 'prop:secure_ops.identity_desk') { this.s.emit('ui', 'access'); return true; }

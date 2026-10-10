@@ -1,0 +1,12 @@
+import { standFor } from '../src/game/systems/Reach';
+import { findPath, nearestReachable, walkableFor } from '../src/game/systems/Grid';
+import { ROOM_BY_ID, GRID, isWalkable } from '../src/data/map';
+const passes = new Set<any>(['ops_pass', 'bacs_audit_pass']);
+const from = { x: 34, y: 32 };
+const r = standFor('prop:bacs_vault.staging_cabinet', from, passes);
+console.log('stand', r ? r.goal : null, r?.path.length);
+const walk = walkableFor(passes);
+const g = nearestReachable(walk, from, 54.5, 46.5);
+console.log('nearestReachable', g);
+const b = ROOM_BY_ID.bacs_vault; console.log(b.x0, b.y0, b.w, b.h, b.doors.map(d => d.id + JSON.stringify(d.cells)));
+console.log(findPath(walk, from, { x: 52, y: 40 }, 8000)?.length);

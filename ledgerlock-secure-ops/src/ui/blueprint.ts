@@ -5,16 +5,17 @@ import type { SceneApi } from '../game/sceneApi';
 import type { RoomId, RouteDef, RouteType, Tone } from '../game/types';
 import { measuresOf, overallConfidence } from '../game/systems/Confidence';
 import { settings } from '../game/systems/Settings';
-import { DIAGRAMS, EQUIPMENT_BY_ID, GRAPH_ROOMS, GRAPH_ROOM_BY_ID, incidentLink, nodeOf, type DiagramView, type IncidentLink } from '../data/facilityGraph';
-import { ROOM_BY_ID } from '../data/map';
+import { CORRIDOR_BY_ID, DIAGRAMS, EQUIPMENT_BY_ID, GRAPH_ROOMS, GRAPH_ROOM_BY_ID, LOOPS, incidentLink, loopLinks, loopRooms, nodeName, nodeOf, WING_LABEL, type DiagramView, type IncidentLink } from '../data/facilityGraph';
+import { DOOR_BY_ID, LINK_BY_ID, ROOM_BY_ID, doorInfo, linkInfo } from '../data/map';
+import { isKnown, discoveredCount } from '../game/systems/Fog';
 import { PASSES } from '../data/passes';
 import { ROUTE_BY_ID, ROUTES, STATE_LABEL } from '../data/routes';
 import { TOOL_BY_ID } from '../data/tools';
 import { describeTarget } from '../data/targets';
 import { $, $$, esc } from './dom';
-import { dashFor, diagramSvg, nodeLabel, overviewBox, overviewSvg, roomLocked, roomSvg, routeColour, stateOf } from './blueprintSvg';
+import { DOOR_STYLE, dashFor, diagramSvg, nodeLabel, overviewBox, overviewSvg, roomLocked, roomSvg, routeColour, stateOf, type MapLayer } from './blueprintSvg';
 
-type Tab = 'overview' | 'systems' | 'room' | 'incident';
+type Tab = 'facility' | 'systems' | 'access' | 'incident' | 'room';
 export interface BlueprintHost {
   state: GameState; runner: MissionRunner; scene: SceneApi;
   toast(html: string, tone?: Tone): void;
@@ -29,9 +30,11 @@ const SEV: Record<string, string> = { Low: 'good', Medium: 'warn', High: 'bad', 
 export class BlueprintView {
   private box: HTMLElement | null = null;
   isOpen = false;
-  private tab: Tab = 'overview';
+  private tab: Tab = 'facility';
   private mode: 'iso' | 'top' = 'iso';
-  private showRoutes = true;
+  private selDoor: string | null = null;
+  private selCorr: string | null = null;
+  private loop: string | null = null;
   private selRoom: RoomId | null = null;
   private selRoute: string | null = null;
   private selNode: string | null = null;
@@ -48,7 +51,7 @@ export class BlueprintView {
   constructor(private root: HTMLElement, private host: BlueprintHost) {}
 
   // ---------------------------------------------------------------- open / close ----
-  open(tab: Tab = 'overview', sel: { room?: RoomId; route?: string } = {}): void {
+  open(tab: Tab = 'facility', sel: { room?: RoomId; route?: string } = {}): void {
     this.tab = tab;
     if (sel.room) { this.selRoom = sel.room; this.room = sel.room; }
     if (sel.route) this.selRoute = sel.route;
@@ -88,14 +91,14 @@ export class BlueprintView {
   private render(): void {
     if (!this.box) return;
     const s = this.s, m = s.mission, conf = overallConfidence(measuresOf(s)), lk = this.link();
-    const tabs: [Tab, string][] = [['overview', 'Facility map'], ['systems', 'System diagrams'], ['room', 'Room blueprint'], ['incident', 'Incident location']];
+    const tabs: [Tab, string][] = [['facility', 'Facility'], ['systems', 'Systems'], ['access', 'Access'], ['incident', 'Incident'], ['room', 'Room blueprint']];
     let main = '', side = '';
-    if (this.tab === 'overview') { main = this.overviewMain(); side = this.roomPanel(this.selRoom); }
+    if (this.tab === 'facility' || this.tab === 'access') { main = this.overviewMain(this.tab); side = this.mapPanel(); }
     else if (this.tab === 'systems') { main = this.systemsMain(); side = this.routeOrNodePanel(); }
     else if (this.tab === 'room') { main = this.roomMain(); side = this.propPanel(); }
     else { main = this.incidentMain(); side = this.incidentPanel(lk); }
     this.box.innerHTML = `<div class="bp-head"><h2>Facility Map &amp; Systems Blueprint</h2>
-      <div class="bp-stats" aria-label="Shift status"><span class="sh">Shift: <b>${esc(m.title)}</b> · ${esc(s.fmtClock())}</span><span>Service Confidence <b>${conf}%</b></span><span>Active incidents <b>${s.incidents}</b></span></div>
+      <div class="bp-stats" aria-label="Shift status"><span class="sh">Shift: <b>${esc(m.title)}</b> · ${esc(s.fmtClock())}</span><span>Service Confidence <b>${conf}%</b></span><span>Active incidents <b>${s.incidents}</b></span><span>Explored <b>${discoveredCount(s).known}/${discoveredCount(s).total}</b> rooms</span></div>
       <div class="bp-head-btns"><button data-a="player" title="Close and put the camera back on you">⌖ Return to player</button><button data-a="close" class="primary" aria-label="Close the map">Close ✕</button></div></div>
       <div class="bp-tabs" role="tablist" aria-label="Views">${tabs.map(([t, l]) => `<button role="tab" aria-selected="${this.tab === t}" data-tab="${t}">${l}</button>`).join('')}</div>
       <div class="bp-body"><section class="bp-main" aria-label="Map area">${main}</section><aside class="bp-side" aria-label="Details">${side}</aside></div>
@@ -109,12 +112,12 @@ export class BlueprintView {
       <span class="grp"><button data-a="zoomin" aria-label="Zoom in">+</button><button data-a="zoomout" aria-label="Zoom out">−</button><button data-a="zoomreset">Fit</button><button data-a="centre">Centre on me</button></span></div>`;
   }
 
-  private overviewMain(): string {
-    const svg = overviewSvg(this.s, { mode: this.mode, selRoom: this.selRoom, selRoute: this.selRoute, showRoutes: this.showRoutes, incident: this.link(), waypoint: this.waypoint });
-    return `${this.toolbar(`<span class="grp" role="group" aria-label="Map style"><button data-a="mode-iso" aria-pressed="${this.mode === 'iso'}">Isometric plan</button><button data-a="mode-top" aria-pressed="${this.mode === 'top'}">Top-down schematic</button></span>
-      <button data-a="routes" aria-pressed="${this.showRoutes}">Show data routes</button><button data-a="to-systems">Open system diagram</button>`)}
-      <div class="bp-canvas" data-vbkey="ov-${this.mode}">${svg}</div>
-      <p class="bp-hint">Select a room (click, tap, or Tab then Enter; arrow keys move between rooms). Selecting never moves you: use <b>Set waypoint</b> to walk there.</p>`;
+  private overviewMain(layer: MapLayer): string {
+    const svg = overviewSvg(this.s, { mode: this.mode, layer, selRoom: this.selRoom, selDoor: this.selDoor, selCorridor: this.selCorr, loop: this.loop, incident: layer === 'access' ? null : this.link(), waypoint: this.waypoint });
+    const loops = `<span class="grp" role="group" aria-label="Highlight a loop">${LOOPS.map((l) => `<button data-loop="${l.id}" aria-pressed="${this.loop === l.id}" title="${esc(l.note)}">${esc(l.name.replace(' loop', ''))}</button>`).join('')}<button data-loop="" aria-pressed="${!this.loop}">No loop</button></span>`;
+    return `${this.toolbar(`<span class="grp" role="group" aria-label="Map style"><button data-a="mode-iso" aria-pressed="${this.mode === 'iso'}">Isometric plan</button><button data-a="mode-top" aria-pressed="${this.mode === 'top'}">Top-down schematic</button></span>${loops}<button data-a="to-systems">Open system diagram</button>`)}
+      <div class="bp-canvas" data-vbkey="ov-${layer}-${this.mode}">${svg}</div>
+      <p class="bp-hint">${layer === 'access' ? 'Access view: which pass each room needs, which doors are open, locked, sealed by an incident or temporarily disabled, and the workstation bays (purple squares). ' : 'Facility view: the physical rooms, the corridors between them and every door. Data flows are on the Systems tab. '}Select a room, a door or a corridor (click, tap, or Tab then Enter). Selecting never moves you: use <b>Set waypoint</b> to walk there. Unexplored rooms stay silhouettes until you enter them.</p>`;
   }
 
   private systemsMain(): string {
@@ -142,10 +145,10 @@ export class BlueprintView {
     const lk = this.link(), s = this.s, m = s.mission;
     const toggle = `<span class="grp" role="group" aria-label="Show incident on"><button data-a="inc-map" aria-pressed="${this.incView === 'map'}">Show on facility map</button><button data-a="inc-diagram" aria-pressed="${this.incView === 'diagram'}">Show on system diagram</button></span>`;
     if (this.incView === 'map') {
-      const svg = overviewSvg(s, { mode: this.mode, selRoom: lk.sourceRoom, selRoute: lk.routeIds[0] ?? null, showRoutes: true, incident: lk, waypoint: this.waypoint });
+      const svg = overviewSvg(s, { mode: this.mode, layer: 'incident', selRoom: lk.sourceRoom, incident: lk, waypoint: this.waypoint });
       return `${this.toolbar(`${toggle}<button data-a="mode-iso" aria-pressed="${this.mode === 'iso'}">Isometric</button><button data-a="mode-top" aria-pressed="${this.mode === 'top'}">Top-down</button>`)}<div class="bp-canvas" data-vbkey="in-${this.mode}">${svg}</div><p class="bp-hint">${esc(m.alert.headline)}</p>`;
     }
-    const view = DIAGRAMS.find((d) => d.routeIds.some((r) => lk.routeIds.includes(r)) && d.id !== 'access') ?? DIAGRAMS[3];
+    const view = DIAGRAMS.find((d) => d.routeIds.some((r) => lk.routeIds.includes(r))) ?? DIAGRAMS[0];
     const d = diagramSvg(s, { view, types: new Set(ROUTES.map((r) => r.type)), status: 'all', onlyIncident: false, selRoute: lk.routeIds[0] ?? null, selNode: lk.sourceRoom, incident: lk, reduced: settings.data.reducedMotion });
     return `${this.toolbar(toggle)}<div class="bp-canvas" data-vbkey="id-${view.id}">${d.svg}</div><p class="bp-hint">${esc(view.title)}: the incident is marked ⚠, evidence sources ⌕.</p>`;
   }
@@ -153,22 +156,63 @@ export class BlueprintView {
   // ---------------------------------------------------------------- side panels ----
   private chips(st: string) { const l = STATE_LABEL[st as keyof typeof STATE_LABEL]; return `<span class="chip ${st === 'healthy' || st === 'restored' ? 'good' : st === 'quarantined' ? 'bad' : 'warn'}">${l.icon} ${l.label}</span>`; }
 
+  private mapPanel(): string {
+    if (this.selDoor) return this.doorPanel(this.selDoor);
+    if (this.selCorr) return this.corridorPanel(this.selCorr);
+    return this.roomPanel(this.selRoom);
+  }
+
+  private doorRow(d: import('../game/types').DoorDef): string {
+    const di = doorInfo(d, this.s.passes), st = DOOR_STYLE[di.status], room = ROOM_BY_ID[d.toward as RoomId], toName = room ? (isKnown(this.s, room.id) ? room.code + ' ' + room.name : 'unexplored room') : nodeName(d.toward);
+    return `<button class="link" data-godoor="${d.id}">${st.glyph} ${d.side.toUpperCase()} door → ${esc(toName)}</button> <span class="small">${esc(st.word)}${di.status === 'open' ? '' : ': ' + esc(di.reason)}</span>`;
+  }
+
+  private doorPanel(id: string): string {
+    const d = DOOR_BY_ID[id], s = this.s, di = doorInfo(d, s.passes), st = DOOR_STYLE[di.status], link = LINK_BY_ID[d.link], here = GRAPH_ROOM_BY_ID[d.room];
+    const toRoom = ROOM_BY_ID[d.toward as RoomId], toName = toRoom ? (isKnown(s, toRoom.id) ? toRoom.name : 'unexplored room') : nodeName(d.toward);
+    const other = DOOR_BY_ID[`door:${d.toward}.${d.room}`], oi = other ? doorInfo(other, s.passes) : null;
+    const li = linkInfo(d.link, s.passes);
+    const why = di.status === 'open' ? 'You can walk through this door now.' : di.status === 'locked' ? `This door is locked for you. ${di.need ? `Request the <b>${esc(PASSES[di.need].name)}</b> at the door reader (the reader is the small cyan terminal beside the door).` : ''}` : di.status === 'sealed' ? 'An active incident has sealed this optional corridor. Contain or resolve the incident to reopen it. Every required room stays reachable by the main corridors.' : 'Scheduled maintenance has switched this optional corridor off for a short time. It comes back by itself.';
+    return `<h3>Door: ${esc(here.name)} → ${esc(toName)}</h3><div class="row"><span class="chip ${di.status === 'open' ? 'good' : di.status === 'locked' ? 'warn' : 'bad'}">${st.glyph} ${esc(st.word)}</span><span class="chip">${link.kind === 'maintenance' ? 'Optional maintenance corridor' : 'Main corridor'}</span></div>
+      <p>${why}</p>
+      <dl><dt>Reason</dt><dd>${esc(di.reason)}</dd><dt>Needs</dt><dd>${di.need ? esc(PASSES[di.need].name) + ' <span class="small">(' + esc(PASSES[di.need].scope) + ')</span>' : 'Nothing more'}</dd>
+      <dt>Door id</dt><dd><code>${esc(d.id)}</code> on the ${d.side.toUpperCase()} wall</dd><dt>Corridor</dt><dd><button class="link" data-gocorr="${link.id}">${esc(link.label)}</button> (${li.status === 'open' ? 'open' : esc(li.reason)})</dd>
+      <dt>Other end</dt><dd>${esc(toName)}${oi ? `: ${DOOR_STYLE[oi.status].glyph} ${esc(DOOR_STYLE[oi.status].word)}` : ' (open ground: a junction has no door)'}</dd></dl>
+      <div class="row"><button class="primary" data-a="waypoint" data-target="reader:${d.id}">Set waypoint to the reader</button><button data-a="flash" data-target="reader:${d.id}">Show in the game</button><button class="link" data-goroom="${d.room}">Back to ${esc(here.code)}</button></div>`;
+  }
+
+  private corridorPanel(id: string): string {
+    const c = CORRIDOR_BY_ID[id], s = this.s, li = linkInfo(id, s.passes);
+    const end = (n: string) => ROOM_BY_ID[n as RoomId] ? `<button class="link" data-goroom="${n}">${esc(ROOM_BY_ID[n as RoomId].code)} ${esc(ROOM_BY_ID[n as RoomId].name)}</button>` : esc(nodeName(n));
+    const inLoops = LOOPS.filter((l) => loopLinks(l).includes(id));
+    const cells = c.rects.reduce((n, r) => n + r.w * r.h, 0);
+    return `<h3>${esc(c.label)}</h3><div class="row"><span class="chip ${li.status === 'open' ? 'good' : li.status === 'locked' ? 'warn' : 'bad'}">${DOOR_STYLE[li.status].glyph} ${esc(DOOR_STYLE[li.status].word)}</span><span class="chip">${c.kind === 'maintenance' ? 'Optional shortcut' : 'Main corridor'}</span></div>
+      <p>${c.kind === 'maintenance' ? 'An optional maintenance corridor. It saves time but no mission ever needs it.' : 'A main corridor: always open between its two doors (the rooms at each end may still need a pass).'}</p>
+      <dl><dt>Connects</dt><dd>${end(c.from)} ⇄ ${end(c.to)}</dd>
+      <dt>Doors</dt><dd>${c.doors.map((d) => this.doorRow(DOOR_BY_ID[d])).join('<br>') || 'None (open ground at both ends)'}</dd><dt>State</dt><dd>${esc(li.reason)}</dd><dt>Size</dt><dd>${cells} floor cells, 2 wide</dd>
+      <dt>Part of</dt><dd>${inLoops.map((l) => esc(l.name)).join(', ') || 'No loop (a connector)'}</dd></dl>`;
+  }
+
   private roomPanel(id: RoomId | null): string {
-    if (!id) return '<h3>Select a room</h3><p>Choose a room on the map to see its access, doors, systems and equipment.</p>';
+    if (!id) return '<h3>Select a room</h3><p>Choose a room, a door or a corridor on the map to see its access, doors, systems and equipment.</p>';
     const s = this.s, r = GRAPH_ROOM_BY_ID[id], rd = ROOM_BY_ID[id], lk = roomLocked(s, id), inc = this.link();
+    if (!isKnown(s, id)) return `<h3>Unexplored room</h3><p>You have not been inside this room yet. It shows as a silhouette until you walk in. Its name and equipment are hidden; the doors that lead to it are marked on the map.</p><p class="small">${esc(WING_LABEL[r.wing])}</p><div class="row"><button class="primary" data-a="waypoint" data-target="room:${id}">Set waypoint</button></div>`;
     const routes = r.routeIds.map((x) => ROUTE_BY_ID[x]);
     const ev = inc.evidence.filter((e) => e.room === id);
     const status = rd.props.map((p) => s.status[p.id]).filter(Boolean) as string[];
     const worst = status.includes('bad') ? 'Unsafe state found' : status.includes('suspect') ? 'Something suspicious here' : status.length ? 'Checked: looks fine' : 'Not checked yet';
     const clues = [...s.clues.values()].slice(-1)[0];
+    const loops = LOOPS.filter((l) => l.nodes.includes(id));
     return `<h3>${esc(r.code)} · ${esc(r.name)}</h3><div class="row"><span class="chip ${lk ? 'warn' : 'good'}">${lk ? '\u{1F512} Locked for you' : '✓ Open'}</span>${inc.sourceRoom === id ? '<span class="chip bad">⚠ Incident source</span>' : ''}<span class="chip">${esc(worst)}</span></div>
       <p>${esc(rd.blurb)}</p>
-      <dl><dt>Location</dt><dd>Column ${'ABCD'[r.col]}, row ${r.row + 1} (grid ${r.x0},${r.y0})</dd><dt>Access pass</dt><dd>${esc(r.passName)} ${lk ? '(not held)' : '(held)'}<br><small>${esc(PASSES[rd.requiredPass].scope)}</small></dd>
-      <dt>Doors</dt><dd>${r.doors.map((d) => { const l2 = roomLocked(s, d.toward); return `${d.side.toUpperCase()} → ${esc(GRAPH_ROOM_BY_ID[d.toward].code)} ${l2 ? '\u{1F512} locked' : '✓ open'}`; }).join('<br>')}</dd>
+      <dl><dt>Wing</dt><dd>${esc(WING_LABEL[r.wing])} <span class="small">(grid ${r.x0},${r.y0}, ${r.w}×${r.h} cells)</span></dd><dt>Access pass</dt><dd>${esc(r.passName)} ${lk ? '(not held)' : '(held)'}<br><small>${esc(PASSES[rd.requiredPass].scope)}</small></dd>
+      <dt>Doors</dt><dd>${rd.doors.map((d) => this.doorRow(d)).join('<br>')}</dd>
+      <dt>Loops</dt><dd>${loops.map((l) => `<button class="link" data-loop="${l.id}">${esc(l.name)}</button>`).join(', ') || 'None (a connector)'}</dd>
+      ${r.bays.length ? `<dt>Workstation bays</dt><dd>${r.bays.map((b) => `${esc(b.label)} <span class="small">(${esc(b.dept)})</span>`).join('<br>')}</dd>` : ''}
       <dt>Connected systems</dt><dd>${routes.map((x) => `<button class="link" data-goroute="${x.id}">${esc(x.name)}</button> ${this.chips(stateOf(s, x.id))}`).join('<br>') || 'None'}</dd>
       <dt>Evidence here</dt><dd>${ev.length ? ev.map((e) => `${s.evidence.has(e.id) ? '✓' : '○'} ${esc(e.name)}`).join('<br>') : 'None'}</dd>
       <dt>Latest clue</dt><dd>${clues ? esc(clues.label) : 'No clues yet'}</dd></dl>
-      <div class="row"><button class="primary" data-a="waypoint" data-target="room:${id}" ${'' /* always reachable: locked rooms walk to the corridor outside */}>Set waypoint</button><button data-a="roomview" data-room="${id}">Room blueprint</button><button data-a="flash" data-target="room:${id}">Show in the game</button></div>
+      <div class="row"><button class="primary" data-a="waypoint" data-target="room:${id}">Set waypoint</button><button data-a="roomview" data-room="${id}">Room blueprint</button><button data-a="flash" data-target="room:${id}">Show in the game</button></div>
       <p class="small">${lk ? 'This room is locked for you, so the waypoint is the corridor outside its door. Door readers show how to request the pass. A locked room never blocks the corridors.' : 'Setting a waypoint walks you there. It never teleports you.'}</p>`;
   }
 
@@ -234,14 +278,21 @@ export class BlueprintView {
       <div class="row">${this.host.openBoard ? '<button class="primary" data-a="board">Open the Incident Board</button>' : ''}<button data-a="flash" data-target="room:${lk.sourceRoom}">Show in the game</button></div>`;
   }
 
+  private doorLegend(): string {
+    return `<div class="lg" aria-label="Door states">${(['open', 'locked', 'sealed', 'disabled'] as const).map((k) => {
+      const st = DOOR_STYLE[k], shape = k === 'open' ? `<circle cx="9" cy="9" r="7" fill="${st.colour}"/>` : k === 'locked' ? `<rect x="2" y="2" width="14" height="14" fill="${st.colour}"/>` : k === 'sealed' ? `<polygon points="9,0 18,9 9,18 0,9" fill="${st.colour}"/>` : `<rect x="2" y="2" width="14" height="14" fill="none" stroke="${st.colour}" stroke-width="3" stroke-dasharray="${st.dash}"/>`;
+      return `<span><svg width="18" height="18" aria-hidden="true">${shape}</svg> ${st.word}</span>`;
+    }).join('')}<span><i class="sq" style="background:#1f3556;border:1px solid #34517f"></i> main corridor</span><span><i class="sq" style="background:#2a3a4a;border:1px dashed #c9b25a"></i> optional maintenance corridor</span><span><i class="sq" style="border:2px solid #CC79A7"></i> workstation bay</span><span><i class="sq" style="background:#0f1b2e;border:1px dashed #34517f"></i> unexplored (silhouette)</span><span>⚠ incident · ⌕ evidence · shapes and words, not only colour</span></div>`;
+  }
   private legend(): string {
+    if (this.tab === 'facility' || this.tab === 'access' || (this.tab === 'incident' && this.incView === 'map')) return `<details class="bp-legend" aria-label="Legend" ${window.innerWidth > 900 ? 'open' : ''}><summary><b>Legend</b></summary>${this.doorLegend()}</details>`;
     const types = [...new Set(ROUTES.map((r) => r.type))];
     const sw = (r: RouteDef, st: string) => `<svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="46" y2="5" stroke="${routeColour(r)}" stroke-width="3" ${dashFor(r, st as never) ? `stroke-dasharray="${dashFor(r, st as never)}"` : ''}/></svg>`;
     const sample = (t: RouteType) => ROUTES.find((r) => r.type === t && !r.dashed) ?? ROUTES.find((r) => r.type === t)!;
     return `<details class="bp-legend" aria-label="Legend" ${window.innerWidth > 900 ? 'open' : ''}><summary><b>Legend</b></summary>
       <div class="lg">${types.map((t) => `<span>${sw(sample(t), 'healthy')} ${TYPE_LABEL[t]}</span>`).join('')}</div>
       <div class="lg"><span><svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="46" y2="5" stroke="#F3F6FA" stroke-width="3"/></svg> solid = active</span><span><svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="46" y2="5" stroke="#F3F6FA" stroke-width="3" stroke-dasharray="9 5"/></svg> dashed = simulated / returning</span><span><svg width="46" height="10" aria-hidden="true"><line x1="0" y1="5" x2="46" y2="5" stroke="#FF7183" stroke-width="3" stroke-dasharray="1 7"/></svg> dotted + \u{1F512} = isolated</span><span>→ arrow = direction</span>
-      <span>${Object.values(STATE_LABEL).map((l) => `${l.icon} ${l.label}`).join(' · ')}</span><span><i class="sq" style="background:#9DE3B1"></i> open door <i class="sq hatch"></i> locked door · grey = corridor (walkable) · amber ⚠ = warning · coral = unsafe</span></div></div>`;
+      <span>${Object.values(STATE_LABEL).map((l) => `${l.icon} ${l.label}`).join(' · ')}</span><span>Data routes are information or money, not corridors: they never block movement.</span></div></details>`;
   }
 
   // ---------------------------------------------------------------- interaction ----
@@ -250,13 +301,15 @@ export class BlueprintView {
     if (d.tab) { this.tab = d.tab as Tab; this.vb = {}; return this.render(); }
     if (d.diagram) { this.diagram = d.diagram as DiagramView['id']; this.selRoute = null; this.selNode = null; return this.render(); }
     if (d.roomPick) { this.room = d.roomPick as RoomId; this.selProp = null; return this.render(); }
-    if (d.goroute) { this.selRoute = d.goroute; this.selNode = null; if (this.tab === 'overview' || this.tab === 'incident') { this.tab = 'systems'; const v = DIAGRAMS.find((x) => x.id !== 'access' && x.routeIds.includes(d.goroute!)); if (v) this.diagram = v.id; } this.host.scene.selectTarget('route:' + d.goroute); return this.render(); }
-    if (d.goroom) { this.selRoom = d.goroom as RoomId; this.tab = 'overview'; return this.render(); }
+    if (d.goroute) { this.selRoute = d.goroute; this.selNode = null; if (this.tab === 'facility' || this.tab === 'access' || this.tab === 'incident') { this.tab = 'systems'; const v = DIAGRAMS.find((x) => x.routeIds.includes(d.goroute!)); if (v) this.diagram = v.id; } this.host.scene.selectTarget('route:' + d.goroute); return this.render(); }
+    if (d.goroom) { this.selRoom = d.goroom as RoomId; this.selDoor = null; this.selCorr = null; this.tab = 'facility'; return this.render(); }
+    if (d.godoor) { this.selDoor = d.godoor; this.selCorr = null; this.selRoom = DOOR_BY_ID[d.godoor].room; if (this.tab !== 'access') this.tab = 'facility'; return this.render(); }
+    if (d.gocorr) { this.selCorr = d.gocorr; this.selDoor = null; if (this.tab !== 'access') this.tab = 'facility'; return this.render(); }
+    if (d.loop !== undefined) { this.loop = d.loop || null; return this.render(); }
     switch (a) {
       case 'close': return this.close();
       case 'player': this.close(); this.host.scene.returnToPlayer(); return;
       case 'mode-iso': case 'mode-top': this.mode = a === 'mode-iso' ? 'iso' : 'top'; return this.render();
-      case 'routes': this.showRoutes = !this.showRoutes; return this.render();
       case 'to-systems': this.tab = 'systems'; return this.render();
       case 'inc-map': case 'inc-diagram': this.incView = a === 'inc-map' ? 'map' : 'diagram'; return this.render();
       case 'zoomin': case 'zoomout': case 'zoomreset': case 'centre': return this.zoom(a);
@@ -274,9 +327,11 @@ export class BlueprintView {
   }
   private onClick(e: MouseEvent): void {
     const t = e.target as HTMLElement;
-    const g = t.closest<HTMLElement>('[data-room],[data-route],[data-node],[data-prop]');
+    const g = t.closest<HTMLElement>('[data-room],[data-route],[data-node],[data-prop],[data-door],[data-corr]');
     if (g && !t.closest('button,input,select') && !g.closest('.bp-side')) {
-      if (g.dataset.room) { this.selRoom = g.dataset.room as RoomId; this.selRoute = null; this.focusKey = `[data-room="${g.dataset.room}"]`; }
+      if (g.dataset.door) { this.selDoor = g.dataset.door; this.selCorr = null; this.selRoom = DOOR_BY_ID[g.dataset.door].room; this.focusKey = `[data-door="${g.dataset.door}"]`; }
+      else if (g.dataset.corr) { this.selCorr = g.dataset.corr; this.selDoor = null; this.focusKey = `[data-corr="${g.dataset.corr}"]`; }
+      else if (g.dataset.room) { this.selRoom = g.dataset.room as RoomId; this.selRoute = null; this.selDoor = null; this.selCorr = null; this.focusKey = `[data-room="${g.dataset.room}"]`; }
       else if (g.dataset.route) { this.selRoute = g.dataset.route; this.selNode = null; this.host.scene.selectTarget('route:' + g.dataset.route); this.focusKey = `[data-route="${g.dataset.route}"]`; }
       else if (g.dataset.node) { this.selNode = g.dataset.node; this.selRoute = null; this.focusKey = `[data-node="${CSS.escape(g.dataset.node)}"]`; }
       else if (g.dataset.prop) { this.selProp = g.dataset.prop; this.focusKey = `[data-prop="${g.dataset.prop}"]`; }
@@ -290,9 +345,12 @@ export class BlueprintView {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return this.close(); }
     if ((e.key === 'Enter' || e.key === ' ') && t.matches('g[tabindex]')) { e.preventDefault(); t.dispatchEvent(new MouseEvent('click', { bubbles: true })); return; }
     if (t.matches('g[data-room]') && e.key.startsWith('Arrow')) {
-      const cur = GRAPH_ROOM_BY_ID[t.dataset.room as RoomId], dc = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0, dr = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-      const nxt = GRAPH_ROOMS.find((r) => r.col === cur.col + dc && r.row === cur.row + dr);
-      if (nxt) { e.preventDefault(); ($(this.box!, `[data-room="${nxt.id}"]`) as HTMLElement | null)?.focus(); }
+      // spatial navigation among rooms (a UI convenience only; connections come from the graph)
+      const cur = GRAPH_ROOM_BY_ID[t.dataset.room as RoomId], dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0, dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      const cx = cur.x0 + cur.w / 2, cy = cur.y0 + cur.h / 2;
+      let best: { id: RoomId; d: number } | null = null;
+      for (const r of GRAPH_ROOMS) { if (r.id === cur.id) continue; const vx = r.x0 + r.w / 2 - cx, vy = r.y0 + r.h / 2 - cy, along = vx * dx + vy * dy; if (along <= 0) continue; const d = Math.hypot(vx, vy) + Math.abs(dx ? vy : vx) * 1.5; if (!best || d < best.d) best = { id: r.id, d }; }
+      if (best) { e.preventDefault(); ($(this.box!, `[data-room="${best.id}"]`) as HTMLElement | null)?.focus(); }
     }
     if (e.key === 'Tab') { /* default order: tabs, canvas, side panel, footer */ }
     e.stopPropagation();                                                         // keep game hotkeys (WASD, T, G...) out of the overlay
@@ -315,8 +373,7 @@ export class BlueprintView {
     const vb = c.svg.viewBox.baseVal;
     if (a === 'zoomreset') { delete this.vb[c.key]; return this.render(); }
     if (a === 'centre') {
-      const P = (this.mode === 'iso' || this.tab === 'overview' || this.tab === 'incident') ? null : null; void P;
-      const sc = this.host.state.player, b = overviewBox(this.mode); const k = this.mode === 'iso' ? { x: ((sc.x - sc.y) * 48 * 0.62) / 2, y: ((sc.x + sc.y) * 24 * 0.62) / 2 } : { x: sc.x * 15, y: sc.y * 15 };
+            const sc = this.host.state.player, b = overviewBox(this.mode); const k = this.mode === 'iso' ? { x: ((sc.x - sc.y) * 48 * 0.62) / 2, y: ((sc.x + sc.y) * 24 * 0.62) / 2 } : { x: sc.x * 15, y: sc.y * 15 };
       const w = Math.min(b.w, vb.width * 0.5), h = w * (vb.height / vb.width);
       this.vb[c.key] = { x: k.x - w / 2, y: k.y - h / 2, w, h }; return this.render();
     }
@@ -327,7 +384,7 @@ export class BlueprintView {
   private bindPan(): void {
     let drag: { x: number; y: number; vx: number; vy: number; key: string; svg: SVGSVGElement } | null = null;
     this.box!.addEventListener('pointerdown', (e) => {
-      const t = e.target as HTMLElement; if (t.closest('[data-room],[data-route],[data-node],[data-prop],button')) return;
+      const t = e.target as HTMLElement; if (t.closest('[data-room],[data-route],[data-node],[data-prop],[data-door],[data-corr],button')) return;
       const c = this.curSvg(); if (!c || !(t.closest('.bp-canvas'))) return;
       drag = { x: e.clientX, y: e.clientY, vx: c.svg.viewBox.baseVal.x, vy: c.svg.viewBox.baseVal.y, key: c.key, svg: c.svg };
     });

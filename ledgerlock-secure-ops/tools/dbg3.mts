@@ -1,0 +1,13 @@
+import { DOOR_BY_ID, GRID, isWalkable, cellKey } from '../src/data/map';
+import { walkableFor, findPath } from '../src/game/systems/Grid';
+const d = DOOR_BY_ID['door:audit_gallery.jnw'];
+console.log(JSON.stringify(d.cells), d.side);
+const walk = walkableFor(new Set(['ops_pass'] as any));
+const out = { x: d.cells[0].x, y: d.cells[0].y + 1 };
+console.log('out kind', GRID.kind[out.y][out.x], walk(out.x, out.y));
+for (let y = out.y - 1; y <= out.y + 6; y++) console.log(y, Array.from({length: 24}, (_, x) => GRID.kind[y][x + 0] === 'void' ? '.' : GRID.kind[y][x] === 'corridor' ? '+' : GRID.kind[y][x] === 'wall' ? '#' : GRID.kind[y][x] === 'door' ? 'D' : ' ').join(''));
+import { ROOM_BY_ID } from '../src/data/map';
+import { nearestWalkable } from '../src/game/systems/Grid';
+const a = ROOM_BY_ID.secure_ops, start = nearestWalkable(walk, a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
+console.log('start', start, walk(start.x, start.y));
+for (const t of [{x:34,y:21},{x:34,y:16},{x:20,y:16},{x:14,y:16},{x:6,y:16}]) console.log(JSON.stringify(t), findPath(walk, start, t, 9000)?.length);

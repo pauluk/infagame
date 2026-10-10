@@ -3,7 +3,8 @@ import type { PaletteKey } from './constants';
 export type RoomId =
   | 'api_gateway' | 'event_stream' | 'fabric_platform' | 'integration_exchange'
   | 'service_payments' | 'finance_core' | 'payment_orchestration' | 'bacs_vault'
-  | 'secure_ops' | 'card_payments' | 'debt_recovery' | 'agency_handoff';
+  | 'secure_ops' | 'card_payments' | 'debt_recovery' | 'agency_handoff'
+  | 'audit_gallery' | 'payroll_pensions';
 
 export type ExternalId = 'bank_sim' | 'card_network_sim' | 'agency_sim' | 'reporting_display';
 
@@ -11,6 +12,8 @@ export type PassId =
   | 'ops_pass' | 'service_audit_pass' | 'api_audit_pass' | 'payments_audit_pass' | 'event_trace_pass'
   | 'ledger_read_pass' | 'payment_ops_pass' | 'bacs_audit_pass' | 'debt_read_pass'
   | 'agency_audit_pass' | 'fabric_observer_pass' | 'integration_audit_pass'
+  | 'audit_gallery_pass' | 'staff_office_pass'
+  | 'maintenance_pass' | 'courier_pass'   // open optional maintenance shortcuts, never a required route
   | 'token_rotation_pass';        // special: time-limited rotation approval (opens no door)
 
 export type Side = 'n' | 'e' | 's' | 'w';
@@ -31,19 +34,20 @@ export interface PropDef {
 }
 
 export interface DoorDef {
-  id: string;                 // door:<room>.<side>
+  id: string;                 // door:<room>.<link id>
   room: RoomId;               // the room this door belongs to / leads into
   side: Side;
   cells: [Cell, Cell];        // two cells in the room's wall line
-  toward: RoomId;             // neighbouring room reached via the corridor outside
+  toward: string;             // the graph node (room or junction id) at the other end of the corridor outside
   readerCell: Cell;           // wall cell carrying the access reader
+  link: string;               // the facility-graph link (corridor) this door opens onto
 }
 
 export interface RoomDef {
   id: RoomId;
   code: string;               // A1..D3
   name: string;
-  col: number; row: number;
+  wing: import('../data/rooms').Wing;
   x0: number; y0: number; w: number; h: number;
   accent: PaletteKey;
   blurb: string;
@@ -96,7 +100,7 @@ export type DialogSpec =
   | { type: 'choice'; title: string; body: string; options: { id: string; label: string; detail: string }[]; onChoose: (id: string) => void }
   | { type: 'info'; title: string; body: string; rows?: [string, string][]; compare?: { before: [string, string][]; after: [string, string][] } }
   | { type: 'alert' }
-  | { type: 'access'; readerRoom?: RoomId }
+  | { type: 'access'; readerRoom?: RoomId; door?: string }
   | { type: 'board' }
   | { type: 'confidence' }
   | { type: 'goals' };

@@ -11,7 +11,8 @@ import { GameState } from '../systems/GameState';
 import { MissionRunner } from '../systems/MissionRunner';
 import { settings } from '../systems/Settings';
 import { sfx } from '../systems/Sfx';
-import { ENTRANCE, EXTERNALS, FAC_H, FAC_W, FAC_X0, FAC_Y0, GRID, ROOMS, ROOM_BY_ID, WORLD_H, WORLD_W, roomAt } from '../../data/map';
+import { ENTRANCE, EXTERNALS, GRID, ROOMS, ROOM_BY_ID, WORLD_H, WORLD_W, doorInfo, roomAt } from '../../data/map';
+import { isKnown } from '../systems/Fog';
 import { PASSES } from '../../data/passes';
 import { ROUTE_BY_ID, pointAt, routePoints, routeRooms } from '../../data/routes';
 import { TOOL_BY_ID } from '../../data/tools';
@@ -56,6 +57,10 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private doorSprites = new Map<string, Phaser.GameObjects.Image>();
   private readerSprites = new Map<string, Phaser.GameObjects.Image>();
   private roomLabels = new Map<RoomId, Phaser.GameObjects.Text>();
+  /** Everything that belongs to a room, so undiscovered rooms can be drawn as silhouettes. */
+  private roomObjs = new Map<RoomId, { floors: { img: Phaser.GameObjects.Image; tint: number | null }[]; walls: Phaser.GameObjects.Image[]; props: Phaser.GameObjects.Image[] }>();
+  private fogSig = '';
+  private objsOf(id: RoomId) { let o = this.roomObjs.get(id); if (!o) { o = { floors: [], walls: [], props: [] }; this.roomObjs.set(id, o); } return o; }
   private walls: { img: Phaser.GameObjects.Image; gx: number; gy: number }[] = [];
   private propSprites = new Map<string, Phaser.GameObjects.Image>();
   private statusLabels = new Map<string, Phaser.GameObjects.Text>();
@@ -123,8 +128,9 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private S = (gx: number, gy: number) => toScreen(gx, gy);
 
   private buildFloors(): void {
-    for (let y = FAC_Y0; y < FAC_Y0 + FAC_H; y++) for (let x = FAC_X0; x < FAC_X0 + FAC_W; x++) {
+    for (let y = 0; y < WORLD_H; y++) for (let x = 0; x < WORLD_W; x++) {
       const k = GRID.kind[y][x];
+      if (k === 'void') continue;
       const room = GRID.roomOf[y][x];
       let frame = 'floor_corridor';
       if (k === 'room') frame = (x + y) % 2 ? 'floor_a' : 'floor_b';
@@ -133,7 +139,9 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       const p = this.S(x + 0.5, y + 0.5);
       const img = makeImage(this, 'environment', frame, p.x, p.y).setDepth(-10000 + x + y);
       img.setScale(img.scaleX * 1.035);
-      if (k === 'room' && room) img.setTint(mix(0xffffff, C[ROOM_BY_ID[room].accent], 0.22));
+      let tint: number | null = null;
+      if (k === 'room' && room) { tint = mix(0xffffff, C[ROOM_BY_ID[room].accent], 0.22); img.setTint(tint); }
+      if (room) this.objsOf(room).floors.push({ img, tint });
     }
   }
 
@@ -144,6 +152,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
         const p = this.S(x + 0.5, y + 0.5);
         const img = makeImage(this, 'environment', frame, p.x, p.y).setDepth(depthOf(x + 0.5, y + 0.5, bias));
         this.walls.push({ img, gx: x + 0.5, gy: y + 0.5 });
+        this.objsOf(r.id).walls.push(img);
       };
       for (let x = r.x0; x <= x1; x++) {
         for (const y of [r.y0, y1]) {
@@ -184,16 +193,34 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   }
 
   private refreshAccess(): void {
+    const passes = this.state.passes;
     for (const r of ROOMS) {
-      const open = this.state.passes.has(r.requiredPass);
+      const open = passes.has(r.requiredPass);
       for (const d of r.doors) {
+        const st = doorInfo(d, passes).status, isOpen = st === 'open';
         const spr = this.doorSprites.get(d.id), rd = this.readerSprites.get(d.id);
-        const frame = this.doorFrame(d, open);
+        const frame = this.doorFrame(d, isOpen);
         if (spr && hasFrame(this, 'environment', frame)) spr.setFrame(frame);
-        if (rd && hasFrame(this, 'environment', open ? 'reader_ok' : 'reader')) rd.setFrame(open ? 'reader_ok' : 'reader');
+        spr?.setTint(st === 'sealed' ? 0xff7183 : st === 'disabled' ? 0x8a94a6 : 0xffffff);
+        if (rd && hasFrame(this, 'environment', isOpen ? 'reader_ok' : 'reader')) rd.setFrame(isOpen ? 'reader_ok' : 'reader');
       }
       const lbl = this.roomLabels.get(r.id);
       if (lbl) lbl.setText(this.roomLabelText(r, open));
+    }
+    this.applyFog();
+  }
+  /** Undiscovered rooms are silhouettes: dark floor and walls, no equipment, no name. */
+  private applyFog(): void {
+    const sig = ROOMS.map((r) => (isKnown(this.state, r.id) ? 1 : 0)).join('');
+    if (sig === this.fogSig) return;
+    this.fogSig = sig;
+    for (const r of ROOMS) {
+      const known = isKnown(this.state, r.id), o = this.roomObjs.get(r.id); if (!o) continue;
+      for (const f of o.floors) { if (known) { f.tint === null ? f.img.clearTint() : f.img.setTint(f.tint); f.img.setAlpha(1); } else f.img.setTint(0x16243b).setAlpha(0.95); }
+      for (const w of o.walls) { if (known) w.clearTint(); else w.setTint(0x22344f); }
+      for (const p of o.props) p.setVisible(known);
+      this.roomLabels.get(r.id)?.setVisible(known);
+      for (const p of r.props) { const t = this.statusLabels.get(p.id); if (t && !known) t.setVisible(false); }
     }
   }
   private roomLabelText(r: RoomDef, open: boolean): string {
@@ -204,7 +231,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     for (const r of ROOMS) for (const p of r.props) {
       const s = this.S(p.gx + 0.5, p.gy + 0.5);
       const img = makeImage(this, 'props', p.sprite, s.x, s.y).setDepth(depthOf(p.gx + 0.5, p.gy + 0.5, 2));
-      this.propSprites.set(p.id, img);
+      this.propSprites.set(p.id, img); this.objsOf(r.id).props.push(img);
     }
   }
 
@@ -228,8 +255,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
 
   private buildPlayer(): void {
     const start = ROOM_BY_ID[this.state.mission.startRoom];
-    this.pos = { x: start.x0 + 5.5, y: start.y0 + 4.5 };
-    this.from = { x: Math.floor(this.pos.x), y: Math.floor(this.pos.y) };
+    const spawn = nearestWalkable(walkableFor(this.state.passes), start.x0 + start.w / 2, start.y0 + start.h / 2, 5) ?? { x: start.x0 + 5, y: start.y0 + 4 };
+    this.from = { x: spawn.x, y: spawn.y };
     this.pos = { x: this.from.x + 0.5, y: this.from.y + 0.5 };
     const s = this.S(this.pos.x, this.pos.y);
     this.player = makeImage(this, 'characters', 'eng_se_idle_0', s.x, s.y);
@@ -238,7 +265,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   /** Team (Manager mode) and Auto-play share one controller; the player's avatar is driven through this body when Auto-play is on. */
   private buildTeam(): void {
     const room = ROOM_BY_ID[this.state.mission.startRoom], walk = walkableFor(this.state.passes);
-    const spawn = [0, 1, 2, 3].map((i) => nearestWalkable(walk, room.x0 + 2 + i * 2, room.y0 + 4, 4) ?? this.from);
+    const spawn = [0, 1, 2, 3].map((i) => nearestWalkable(walk, room.x0 + room.w / 2 - 3 + i * 2, room.y0 + room.h / 2 + 1, 5) ?? this.from);
     const body: ExternalBody = {
       cell: () => this.to ?? this.from, pos: () => this.pos,
       walkTo: (c) => this.walkTo(c), idle: () => !this.to && !this.path.length,
@@ -592,7 +619,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.flow.updateLabels(this.state.routeStates, this.state.selectedTarget);
     this.refreshAccessLabelsOnly();
   }
-  private refreshAccessLabelsOnly(): void { /* labels refreshed on pass events */ }
+  private refreshAccessLabelsOnly(): void { this.applyFog(); }
 
   /** Service Confidence on the Control Room wall: five measures plus the balanced overall score (text and bars, not colour only). */
   private updateWallBoard(): void {
