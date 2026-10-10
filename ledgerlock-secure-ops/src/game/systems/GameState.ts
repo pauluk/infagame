@@ -22,7 +22,7 @@ export type StateEvents = {
   result: ResultCard;
   dialog: DialogSpec;
   fx: { type: 'scan' | 'sparkle' | 'alarm' | 'barrier' | 'release' | 'pass' | 'repair'; target: string };
-  ui: 'map' | 'log' | 'fabric' | 'blueprint';
+  ui: 'map' | 'log' | 'fabric' | 'blueprint' | 'board';
   complete: GameState;
   pass: { pass: PassId; granted: boolean };
 };
@@ -30,8 +30,9 @@ export type StateEvents = {
 /** Pure game state: no Phaser/DOM references. Scenes and the DOM UI subscribe to its events. */
 export class GameState extends Emitter<StateEvents> {
   flags: Record<string, boolean> = {};
-  clues = new Map<string, { label: string; text: string }>();
+  clues = new Map<string, { label: string; text: string; t: string; room: RoomId | null }>();
   evidence = new Set<string>();
+  evidenceTimes: Record<string, { t: string; room: RoomId | null }> = {};
   passes = new Set<PassId>(['ops_pass']);
   passDenials = 0;
   entities: Record<string, Entity> = {};
@@ -88,7 +89,7 @@ export class GameState extends Emitter<StateEvents> {
   setStatus(target: string, st: Status | undefined): void { if (st) this.status[target] = st; else delete this.status[target]; this.changed(); }
   addClue(id: string, label: string, text: string): boolean {
     if (this.clues.has(id)) return false;
-    this.clues.set(id, { label, text }); this.changed(); return true;
+    this.clues.set(id, { label, text, t: this.fmtClock(), room: this.player.room }); this.changed(); return true;
   }
   log(text: string, tone: Tone = 'info'): void {
     const e = { t: this.fmtClock(), text, tone }; this.logEntries.push(e); this.emit('log', e);

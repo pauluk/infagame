@@ -1,0 +1,65 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'collection-connection', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-301', title: 'Agency export carries more data than approved', severity: 'Medium', sourceRoom: 'debt_recovery', affectedRouteIds: ['debt_agency_export'],
+    evidenceIds: ['ev_export_scope'],
+    evidenceNotes: { ev_export_scope: 'The export sends reference, outstanding amount, debtor name (masked), employer name and a full date of birth. The data-sharing scope approves only the first three.' },
+    keyObjective: 'Compare the export with the approved field checklist and remove what is not needed',
+    prompt: 'Compare the approved checklist with the proposed export. Mark every field that is out of place, then submit.',
+    puzzleType: 'missing',
+    puzzlePieces: { type: 'missing', expectedTitle: 'Approved field checklist (AGY-01)', currentTitle: 'Proposed export (mapping v2.3)', items: [
+      { id: 'ref', label: 'debt_reference', expected: 'Included', current: 'Included', okWhy: 'The agency needs the reference to identify the debt.' },
+      { id: 'amt', label: 'outstanding_amount', expected: 'Included', current: 'Included', okWhy: 'The agency needs the amount: removing it would break the export.' },
+      { id: 'name', label: 'debtor_name (masked)', expected: 'Included, masked', current: 'Included, masked', okWhy: 'A masked name is in the approved scope.' },
+      { id: 'emp', label: 'employer_name', expected: 'Not in the approved scope', current: 'Included in the export', problem: 'The agency does not need the employer. Sending it shares more personal data than the agreement allows.', okWhy: '' },
+      { id: 'dob', label: 'date_of_birth_full', expected: 'Not in the approved scope', current: 'Included in the export', problem: 'A full date of birth is sensitive and not needed to act on a debt: it caused the hold.', okWhy: '' },
+      { id: 'dest', label: 'Destination', expected: 'Fictional Agency Ltd (AGY-01)', current: 'Fictional Agency Ltd (AGY-01)', okWhy: 'The destination is the approved fictional agency.' }] },
+    hintText: ['Compare each line: does the export include only what the checklist allows?', 'Two fields are outside the approved scope.', 'employer_name and date_of_birth_full are the extras.'],
+    clueOrder: ['ev_export_scope'],
+    failureFeedback: { default: 'Compare the approved checklist with the proposed export line by line.' },
+    successFeedback: 'The date-of-birth field is identified as the cause and the export mapping now sends only the approved fields (v2.4).',
+    actions: ['step:field', 'step:remove_fields'], requiredObjectives: ['p3'], routeStateOnSuccess: { routeId: 'debt_agency_export', state: 'suspicious' } },
+
+  { ...base, incidentId: 'INC-302', title: 'Hold the original; send only the corrected file', severity: 'Medium', sourceRoom: 'agency_handoff', affectedRouteIds: ['debt_agency_export'],
+    evidenceIds: ['ev_export_scope', 'ev_destination'],
+    evidenceNotes: { ev_export_scope: 'The original export (41 records) includes fields outside the approved scope.', ev_destination: 'The destination is the approved fictional agency (AGY-01) over the secure link. Only the file contents were wrong.' },
+    keyObjective: 'Hold only the affected transfer, then send the approved file',
+    prompt: 'Connect each file to where it belongs. Card repayments and other receipts must keep processing.',
+    puzzleType: 'cable',
+    puzzlePieces: { type: 'cable', ports: [
+      { id: 'orig', side: 'source', label: 'Original export', detail: '41 records · excess fields' },
+      { id: 'fixed', side: 'source', label: 'Corrected export v2.4', detail: '40 records · approved fields only' },
+      { id: 'card', side: 'source', label: 'Card repayments and other receipts', detail: 'unaffected' },
+      { id: 'hold', side: 'dest', label: 'Hold queue', detail: 'not sent' },
+      { id: 'agency', side: 'dest', label: 'Integration Exchange → fictional agency', detail: 'approved link AGY-01' },
+      { id: 'normal', side: 'dest', label: 'Normal processing', detail: 'keeps running' },
+      { id: 'rush', side: 'dest', label: 'Send everything now', detail: 'skips the hold and the approval' }] },
+    validConnections: [['orig', 'hold'], ['fixed', 'agency'], ['card', 'normal']],
+    hintText: ['Which file must not leave the building?', 'Only the corrected file goes to the approved agency.', 'Card repayments are unrelated: leave them on normal processing.'],
+    clueOrder: ['ev_export_scope', 'ev_destination'],
+    failureFeedback: { 'orig>agency': 'The original export contains fields outside the approved scope: it must not be sent.', 'orig>normal': 'The original must be held, not processed as normal.', 'fixed>hold': 'The corrected file is approved to go: holding it delays the hand-off for no reason.', 'fixed>normal': 'The corrected export goes through the Integration Exchange to the agency, not through normal processing.', 'card>hold': 'Card repayments are unrelated: holding them would stop valid work.', 'card>agency': 'Card repayments never go to the agency.', 'orig>rush': 'Sending the original skips the hold and shares excess personal data.', 'fixed>rush': 'Even the corrected file waits for its approval before it is sent.', 'card>rush': 'Card repayments are unrelated to the agency hand-off.', default: 'Which file is approved to leave, and which must be held?' },
+    successFeedback: 'Only the affected transfer was held. The corrected, minimal export is approved and sent to the fictional agency; other debt receipts continued.',
+    actions: ['contain:hold', 'step:approve_corrected', 'release:hold'], requiredObjectives: ['p4', 'p5'], containTarget: 'route:debt_agency_export' },
+
+  { ...base, incidentId: 'INC-303', title: 'Match the corrected export to its delivery receipt', severity: 'Low', sourceRoom: 'agency_handoff', affectedRouteIds: ['debt_agency_export', 'agency_receipt'],
+    evidenceIds: ['ev_destination'],
+    evidenceNotes: { ev_destination: 'The agency confirms what it received with a delivery receipt. It has to match the approved, corrected file.' },
+    keyObjective: 'Reconcile the delivery receipt against the approved export',
+    prompt: 'When the agency receipt arrives, drag each receipt onto what it belongs to. Some cards are not part of this hand-off.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 'corrected', label: 'Receipt for the corrected export', detail: 'The file that was approved and sent' }, { id: 'other', label: 'Unrelated receipts', detail: 'Keep processing as normal' }],
+      pieces: [
+        { id: 'r1', label: 'Receipt DR-0911 · 40 records · mapping v2.4', detail: 'Fictional agency', shape: 'circle', why: 'It shows 40 records and mapping v2.4: exactly the corrected export.' },
+        { id: 'r2', label: 'Receipt for 41 records · mapping v2.3', detail: 'Never issued', shape: 'diamond', why: 'The original export (41 records) was held and never sent, so it has no delivery receipt.' },
+        { id: 'r3', label: 'Card repayment receipt', detail: 'Card Payments', shape: 'square', why: 'This is a card repayment receipt, not part of the agency hand-off.' }] },
+    correctMatches: { r1: 'corrected', r3: 'other' },
+    hintText: ['Which receipt describes the corrected file: how many records, which mapping?', 'The held original was never sent, so it cannot have a receipt.', 'Card repayments belong to a different flow.'],
+    clueOrder: ['ev_destination'],
+    failureFeedback: { default: 'Match each receipt to the file it describes.' },
+    successFeedback: 'The agency receipt matches the approved corrected export (40 records, mapping v2.4). The hand-off is reconciled.',
+    actions: ['step:reconcile_receipt'], requiredObjectives: ['p6'], routeStateOnSuccess: { routeId: 'debt_agency_export', state: 'restored' } },
+];
+export default list;

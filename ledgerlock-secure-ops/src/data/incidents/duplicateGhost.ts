@@ -1,0 +1,68 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'duplicate-ghost', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-101', title: 'Repeated card receipt R-77••', severity: 'Medium', sourceRoom: 'card_payments', affectedRouteIds: ['receipt_event_feed', 'card_receipt'],
+    evidenceIds: ['ev_masked_receipt'],
+    evidenceNotes: { ev_masked_receipt: 'Receipt R-77•• (£42.50, synthetic) was recorded twice under one event ID. The second copy followed one second after the first and carries no idempotency key.' },
+    keyObjective: 'Find which receipt event is the repeat',
+    prompt: 'Four receipt events arrived in the last two minutes. Use the Masked Receipt Log: drag each card onto the role it plays.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 'orig', label: 'Original delivery', detail: 'The first copy of the event' }, { id: 'replay', label: 'Replay: the repeat', detail: 'Same event ID, sent again' }, { id: 'valid', label: 'Different valid receipts', detail: 'Own event ID, delivered once' }],
+      pieces: [
+        { id: 'a', label: 'R-77•• · 14:02:11', detail: 'Event E-77 · idempotency key present', shape: 'circle', why: 'This is the first delivery of event E-77: it carries an idempotency key.' },
+        { id: 'b', label: 'R-77•• · 14:02:12', detail: 'Event E-77 · no key · one second later', shape: 'diamond', why: 'This copy has the same event ID as the first, arrived a second later and has no key: it is the repeat.' },
+        { id: 'c', label: 'R-81•• · 14:02:40', detail: 'Event E-81 · key present', shape: 'square', why: 'R-81 has its own event ID and arrived once: a different, valid receipt.' },
+        { id: 'd', label: 'R-82•• · 14:03:05', detail: 'Event E-82 · key present', shape: 'hex', why: 'R-82 has its own event ID and arrived once: a different, valid receipt.' },
+        { id: 'x', label: 'Settlement total 128', detail: 'A count, not an event', shape: 'triangle', why: 'That is a total, not a receipt event.' }] },
+    correctMatches: { a: 'orig', b: 'replay', c: 'valid', d: 'valid' },
+    hintText: ['Both copies of R-77•• share one event ID. Which one arrived first?', 'A repeat is sent again without the idempotency key.', 'R-81 and R-82 have their own event IDs, so they are different valid receipts.'],
+    clueOrder: ['ev_masked_receipt'],
+    failureFeedback: { 'a@replay': 'R-77•• at 14:02:11 is the first delivery (it has the key). The repeat is the copy with the same event ID that arrived one second later.', 'b@orig': 'This copy arrived after the first and has no key, so it is the repeat, not the original.', default: 'Compare the event ID, the time and whether the idempotency key is present (Masked Receipt Log).' },
+    successFeedback: 'The second R-77•• copy is the repeat. The Forensic Lens trace is done and the cause is diagnosed: a retry without an idempotency key.',
+    actions: ['lens'], requiredObjectives: ['p1', 'p2'], routeStateOnSuccess: { routeId: 'receipt_event_feed', state: 'suspicious' } },
+
+  { ...base, incidentId: 'INC-102', title: 'Replay loop on the Receipt Event Feed', severity: 'High', sourceRoom: 'event_stream', affectedRouteIds: ['receipt_event_feed'],
+    evidenceIds: ['ev_replay_trace', 'ev_ledger_check'],
+    evidenceNotes: { ev_replay_trace: 'Event R-77•• was delivered three times. Each copy reached the Finance Core consumer. Only the replays lack an idempotency key.', ev_ledger_check: 'The ledger shows how many times R-77•• has posted. Any extra posting is a duplicate that has to be reversed.' },
+    keyObjective: 'Hold only the replay loop; keep valid receipts flowing',
+    prompt: 'Rebuild the route on the cable board. Replays must be held and cleaned; valid receipts must keep posting on time. Drag from a source port to a destination port.',
+    puzzleType: 'cable',
+    puzzlePieces: { type: 'cable', ports: [
+      { id: 'valid', side: 'source', label: 'Valid receipt events', detail: 'keyed, each delivered once' },
+      { id: 'replay', side: 'source', label: 'Replay loop', detail: 'same event ID, no key' },
+      { id: 'card', side: 'dest', label: 'Card Receipt route', detail: 'via Accounts Receivable · de-duplicates by receipt ID' },
+      { id: 'hold', side: 'dest', label: 'Quarantine hold', detail: 'held until the buffer is cleaned' },
+      { id: 'ledger', side: 'dest', label: 'Ledger poster', detail: 'posts straight to the General Ledger' }] },
+    validConnections: [['valid', 'card'], ['replay', 'hold']],
+    hintText: ['The Replay Trace shows which copies have no idempotency key: those are the loop.', 'Only the loop should be held. Valid receipts must still reach the ledger on time.', 'Valid receipts → Card Receipt route. Replay loop → Quarantine hold.'],
+    clueOrder: ['ev_replay_trace', 'ev_ledger_check'],
+    failureFeedback: { 'replay>ledger': 'That would post the duplicate to the General Ledger: the same receipt would be counted twice. Replays must be held.', 'replay>card': 'The Card Receipt route de-duplicates by receipt ID, but the replay loop has to be held and cleaned, not delivered.', 'valid>hold': 'Holding valid receipts delays them for no reason. Keep them moving on the Card Receipt route.', 'valid>ledger': 'The Receipt Event Feed is being held, so valid receipts need the Card Receipt route to keep posting on time.', default: 'Follow the Replay Trace: which events are repeats and which are valid?' },
+    successFeedback: 'Only the replay path is contained; valid receipts keep flowing on the Card Receipt route. Next: patch the notifier and clean the replay buffer.',
+    actions: ['contain', 'reroute'], fixActions: ['patch', 'restore'], requiredObjectives: ['p3', 'p4'], containTarget: 'route:receipt_event_feed', routeStateOnSuccess: { routeId: 'receipt_event_feed', state: 'rerouted' } },
+
+  { ...base, incidentId: 'INC-103', title: 'Receipt count vs ledger check', severity: 'Medium', sourceRoom: 'finance_core', affectedRouteIds: ['receipt_event_feed', 'finance_event_mirror'],
+    evidenceIds: ['ev_ledger_check'],
+    evidenceNotes: { ev_ledger_check: 'Expected 128 receipts. Received events included the 3 replays. The ledger is the number that has to agree.' },
+    keyObjective: 'Prove the totals agree before the route is released',
+    prompt: 'Before the held route is released, choose the evidence that shows it is safe. A cable or a green light is not enough: pick only what proves the numbers and the cause.',
+    puzzleType: 'verify',
+    puzzlePieces: { type: 'verify',
+      before: [['Expected receipts', '128'], ['Received events', '131 (3 replays)'], ['Ledger postings', '128']],
+      after: [['Expected receipts', '128'], ['Received events', '128 (no replays)'], ['Ledger postings', '128']],
+      cards: [
+        { id: 'c1', label: 'Reconciliation: 128 expected = 128 received = 128 posted', detail: 'Finance Core reconciliation', confirms: true, why: 'Totals agree end to end.' },
+        { id: 'c2', label: 'Replay buffer restored to the 15:00 checkpoint: 0 replays held', detail: 'Event Stream Hall', confirms: true, why: 'No duplicate is left to leak when the route is released.' },
+        { id: 'c3', label: 'Settlement Notifier patched: idempotency key + 5 s wait', detail: 'Card Payments', confirms: true, why: 'The cause is fixed, so no new replays will be created.' },
+        { id: 'x1', label: 'The cable board shows the replay loop connected to the hold', detail: 'Incident Board', confirms: false, why: 'That shows the loop is contained, not that it is safe to release.' },
+        { id: 'x2', label: 'Valid receipts kept posting while the feed was held', detail: 'Availability', confirms: false, why: 'Good for availability, but it does not show the duplicates are gone.' },
+        { id: 'x3', label: 'No one has reported a problem yet', detail: 'Service desk', confirms: false, why: 'Silence is not evidence: check the numbers.' }] },
+    hintText: ['Safe to release means: the numbers agree, nothing replayable is left, and the cause is fixed.', 'Containment and good availability are not proof on their own.', 'Pick the reconciliation, the clean buffer and the patched notifier.'],
+    clueOrder: ['ev_ledger_check'],
+    failureFeedback: { default: 'Choose only the evidence that proves the route is safe to release.' },
+    successFeedback: 'Reconciliation passed. The route is released, the feed is verified (valid receipts flowing, no duplicates) and the Fabric status can be checked next.',
+    actions: ['recon', 'release', 'verify'], requiredObjectives: ['p5'], routeStateOnSuccess: { routeId: 'receipt_event_feed', state: 'restored' } },
+];
+export default list;

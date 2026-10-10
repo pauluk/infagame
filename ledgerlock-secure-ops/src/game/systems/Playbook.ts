@@ -6,6 +6,7 @@ import { describeTarget, propTarget, roomTarget, routeTarget } from '../../data/
 import type { PassId, ToolId } from '../types';
 import type { GameState } from './GameState';
 import { accessFor } from './Reach';
+import type { MissionRunner } from './MissionRunner';
 
 /**
  * A mission "playbook": the best-practice path through a mission as a list of actions. Teammates and Auto-play work through it.
@@ -54,6 +55,11 @@ function compileScenario(m: ScenarioMission): PlayAction[] {
     a.after = [...a.after, ...(barrier ? everyPrev() : lastBarrier ? [lastBarrier] : [])];
     out.push(a); if (barrier) lastBarrier = a.id;
   };
+  if (m.order > 0) {            // campaign missions: reading the Incident Wall is what opens the first pass, so it is the first action
+    const wall = propTarget('secure_ops', 'incident_wall');
+    push({ id: 'brief', label: labelUse('e', wall), role: 'investigator', kind: 'use', target: wall, tool: 'e', after: [], done: (s) => !!s.flags.briefed, ready: () => true });
+    lastBarrier = 'brief';
+  }
   m.script.forEach((act, i) => {
     const [k, v] = act as [string, any];
     if (k === 'pass') push(passAction(m, `pass:${v}:${i}`, v as PassId));
@@ -64,7 +70,7 @@ function compileScenario(m: ScenarioMission): PlayAction[] {
         id: 'step:' + x.id, label: labelUse(x.tool, target), role: roleFor('use', x.tool), kind: 'use', target, tool: x.tool, after: [],
         done: (s) => !!s.flags['st_' + x.id],
         ready: (s) => {
-          if (x.needs?.some((n) => !s.flags['st_' + n])) return 'an earlier step comes first';
+          if (x.needs?.some((n) => !s.flags['st_' + n])) return (x.needsMsg ?? 'an earlier step comes first').replace(/\.$/, '').replace(/^./, (c) => c.toLowerCase());
           if (x.needsPass && !s.passes.has(x.needsPass)) return MISSING(x.needsPass);
           if (ev && !s.passes.has(ev.requiredPass)) return MISSING(ev.requiredPass);
           const acc = accessFor(target, s.passes); return acc === true ? true : MISSING(acc);
@@ -140,4 +146,21 @@ export function playbookFor(m: MissionDef): PlayAction[] {
   let pb = CACHE.get(m);
   if (!pb) { pb = (m as ScenarioMission).script ? compileScenario(m as ScenarioMission) : m.id === 'duplicate-ghost' ? duplicateGhost(m) : []; CACHE.set(m, pb); }
   return pb;
+}
+
+/** Carries out one playbook action through the same MissionRunner calls a player's hands would make. */
+export function performAction(runner: MissionRunner, a: PlayAction): void {
+  const s = runner.s;
+  const prev = s.selectedTool;
+  try {
+    switch (a.kind) {
+      case 'pass': runner.requestPass(a.pass!, 'desk'); break;
+      case 'record': runner.record(a.recordId!); break;
+      case 'report': runner.fileReport(); break;
+      case 'wait': break;
+      default:
+        if (a.tool === 'e') runner.inspect(a.target!);
+        else { s.selectedTool = (a.kind === 'contain' || a.kind === 'release' ? 'quarantine' : a.kind === 'reroute' ? 'reroute' : a.tool) as ToolId; runner.interact(a.target!); }
+    }
+  } finally { s.selectedTool = prev; }
 }

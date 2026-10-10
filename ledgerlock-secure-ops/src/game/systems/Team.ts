@@ -5,7 +5,7 @@ import type { Cell, DialogSpec, ToolId } from '../types';
 import type { GameState } from './GameState';
 import type { MissionRunner } from './MissionRunner';
 import { walkableFor } from './Grid';
-import { ROLE_LABEL, playbookFor, type PlayAction, type Role } from './Playbook';
+import { ROLE_LABEL, performAction, playbookFor, type PlayAction, type Role } from './Playbook';
 import { reachRange, standFor } from './Reach';
 
 export type Facing = 'se' | 'sw' | 'nw' | 'ne';
@@ -46,6 +46,8 @@ export interface TeamOptions {
   spawn: Cell[];
   body?: ExternalBody;
   autoDecide: () => boolean;
+  /** Playbook action ids teammates leave alone (the Incident Board's puzzles carry them out instead). */
+  reserved?: ReadonlySet<string>;
   /** JEV second opinion (optional). When it is on, choices go to JEV first; teammates only act on it when it is confident. */
   jevOn?: () => boolean;
   advise?: (spec: Extract<DialogSpec, { type: 'choice' }>) => Promise<{ id: string; confidence: number } | null>;
@@ -211,7 +213,7 @@ export class TeamController {
   }
   private available(m: Member, any = false): PlayAction[] {
     const s = this.s;
-    const ok = this.actions.filter((a) => a.kind !== 'wait' && !a.done(s) && (!this.claims.has(a.id) || this.claims.get(a.id) === m.id) && !this.blockedBy(a) && (m.coolUntil[a.id] ?? 0) <= s.elapsed);
+    const ok = this.actions.filter((a) => a.kind !== 'wait' && !this.opts.reserved?.has(a.id) && !a.done(s) && (!this.claims.has(a.id) || this.claims.get(a.id) === m.id) && !this.blockedBy(a) && (m.coolUntil[a.id] ?? 0) <= s.elapsed);
     for (const a of ok) this.readyAt[a.id] ??= s.elapsed;
     for (const k of Object.keys(this.readyAt)) if (!ok.some((a) => a.id === k)) delete this.readyAt[k];
     const mine = ok.filter((a) => m.role === 'any' || a.role === m.role);
@@ -308,18 +310,8 @@ export class TeamController {
   private perform(m: Member): void {
     const a = m.task!, s = this.s, r = this.runner;
     s.log(`${m.name}: ${a.label}.`, 'info');
-    const prevTool = s.selectedTool; this.acting = m;
-    try {
-      switch (a.kind) {
-        case 'pass': r.requestPass(a.pass!, 'desk'); break;
-        case 'record': r.record(a.recordId!); break;
-        case 'report': r.fileReport(); break;
-        case 'wait': break;
-        default:
-          if (a.tool === 'e') r.inspect(a.target!);
-          else { s.selectedTool = (a.kind === 'contain' || a.kind === 'release' ? 'quarantine' : a.kind === 'reroute' ? 'reroute' : a.tool) as ToolId; r.interact(a.target!); }
-      }
-    } finally { s.selectedTool = prevTool; this.acting = null; }
+    this.acting = m;
+    try { performAction(r, a); } finally { this.acting = null; }
     if (!m.manual) s.stats.autoActions++;
     m.phase = 'settle'; m.settle = 0.5; m.note = 'Checking the result';
   }

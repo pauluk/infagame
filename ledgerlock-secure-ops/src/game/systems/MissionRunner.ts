@@ -50,7 +50,7 @@ export class MissionRunner {
           return false;
         }
         if (!s.evidence.has(id)) {
-          s.evidence.add(id);
+          s.evidence.add(id); s.evidenceTimes[id] = { t: s.fmtClock(), room: s.player.room };
           s.adjust('audit', 8);
           s.log(`Evidence retrieved: ${ev.name} (${ev.sensitivity})`, 'clue');
           s.score(`Evidence: ${ev.name}`, 'good');

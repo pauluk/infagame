@@ -1,0 +1,68 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'token-on-the-table', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-601', title: 'Which connections depend on the exposed credential?', severity: 'High', sourceRoom: 'integration_exchange', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_log', 'ev_deps'],
+    evidenceNotes: { ev_log: 'A masked log line shows a token-like value for the service svc-remit-gw, 41 days old. It is used by the payment intake route and a partner remittance link.', ev_deps: 'The Connection Panel lists what depends on svc-remit-gw. Card gateway, debt export and the analytics mirror are listed as unaffected.' },
+    keyObjective: 'Match the credential to its dependents before rotating it',
+    prompt: 'Rotating svc-remit-gw interrupts whatever uses it. Drag each connection to "uses it" or "does not use it", using the log and the dependency list.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 'uses', label: 'Uses svc-remit-gw', detail: 'Must be updated after rotation' }, { id: 'free', label: 'Does not use it', detail: 'Leave running' }],
+      pieces: [
+        { id: 'intake', label: 'Payment intake route', detail: 'service_payment_intake', shape: 'circle', why: 'The log says the payment intake route uses svc-remit-gw.' },
+        { id: 'partner', label: 'Partner remittance link', detail: 'external partner', shape: 'hex', why: 'The log says a partner remittance link uses svc-remit-gw.' },
+        { id: 'card', label: 'Card gateway', detail: 'Card Payments', shape: 'square', why: 'The dependency list marks the card gateway as unaffected.' },
+        { id: 'debt', label: 'Debt export', detail: 'Debt Recovery', shape: 'diamond', why: 'The dependency list marks the debt export as unaffected.' },
+        { id: 'mirror', label: 'Analytics mirror', detail: 'Fabric', shape: 'triangle', why: 'The dependency list marks the analytics mirror as unaffected.' },
+        { id: 'tok', label: 'tok_••••9f2c (masked)', detail: 'the credential itself', shape: 'pill', why: 'That is the credential, not a connection. Its value is never shown or copied.' }] },
+    correctMatches: { intake: 'uses', partner: 'uses', card: 'free', debt: 'free', mirror: 'free' },
+    hintText: ['Start with the masked log line: which things does it say use the credential?', 'The Connection Panel lists the unaffected services.', 'Two connections use it; three do not.'],
+    clueOrder: ['ev_log', 'ev_deps'],
+    failureFeedback: { default: 'Check the masked log line and the dependency list: does this connection use svc-remit-gw?' },
+    successFeedback: 'The dependents are confirmed. svc-remit-gw is rotated through the Access Desk workflow; unrelated API routes keep running.',
+    actions: ['step:rotate'], requiredObjectives: ['p3'], routeStateOnSuccess: { routeId: 'service_payment_intake', state: 'suspicious' } },
+
+  { ...base, incidentId: 'INC-602', title: 'Which connection still uses the expired token?', severity: 'High', sourceRoom: 'integration_exchange', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_deps'],
+    evidenceNotes: { ev_deps: 'Only the payment intake route and the partner remittance link depended on the old credential. Until they use the new one they fail.' },
+    keyObjective: 'Find every dependent still on the old credential and update it',
+    prompt: 'The credential was just rotated. Compare what each connection should use with what it uses now. Mark every connection still on the old token.',
+    puzzleType: 'missing',
+    puzzlePieces: { type: 'missing', expectedTitle: 'Should now use', currentTitle: 'Uses right now', items: [
+      { id: 'intake', label: 'Payment intake route', expected: 'New credential', current: 'Old credential (requests are failing)', problem: 'It still presents the expired token, so new service payment requests fail until it is updated.', okWhy: '' },
+      { id: 'partner', label: 'Partner remittance link', expected: 'New credential', current: 'Old credential (rejected)', problem: 'The partner link still uses the expired token and is being rejected.', okWhy: '' },
+      { id: 'card', label: 'Card gateway', expected: 'Unchanged', current: 'Unchanged', okWhy: 'It never used svc-remit-gw: nothing to update.' },
+      { id: 'debt', label: 'Debt export', expected: 'Unchanged', current: 'Unchanged', okWhy: 'It never used svc-remit-gw: nothing to update.' },
+      { id: 'mirror', label: 'Analytics mirror', expected: 'Unchanged', current: 'Unchanged', okWhy: 'It never used svc-remit-gw: nothing to update.' }] },
+    hintText: ['Compare each line: does Current match what it should use?', 'The failing ones are the dependents from the previous task.', 'The payment intake route and the partner remittance link.'],
+    clueOrder: ['ev_deps'],
+    failureFeedback: { default: 'Compare what each connection should use with what it uses now.' },
+    successFeedback: 'Both dependent connections now use the new simulated credential. Unrelated routes were not touched.',
+    actions: ['step:update_dep'], requiredObjectives: ['p4'], routeStateOnSuccess: { routeId: 'service_payment_intake', state: 'suspicious' } },
+
+  { ...base, incidentId: 'INC-603', title: 'Prove the rotation worked and the old token is dead', severity: 'Medium', sourceRoom: 'api_gateway', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_log'],
+    evidenceNotes: { ev_log: 'The goal is a service that works with the new credential and refuses the old one.' },
+    keyObjective: 'Confirm the new credential works and the old one is rejected',
+    prompt: 'Choose the evidence that proves it is safe to call the rotation finished.',
+    puzzleType: 'verify',
+    puzzlePieces: { type: 'verify',
+      before: [['Old credential', 'Accepted (exposed)'], ['Payment intake route', 'Failing after rotation']],
+      after: [['New credential', 'Accepted'], ['Old credential', 'Rejected: 401 (simulated)'], ['Payment intake route', 'Flowing']],
+      cards: [
+        { id: 'c1', label: 'API Gateway test passed with the new credential', detail: 'Gateway Console', confirms: true, why: 'Authenticated requests work with the new credential.' },
+        { id: 'c2', label: 'Service payment intake route is flowing', detail: 'Route test', confirms: true, why: 'The downstream route works end to end.' },
+        { id: 'c3', label: 'Old credential rejected: 401 Unauthorised (simulated)', detail: 'Authentication Status Terminal', confirms: true, why: 'The exposed credential is no longer any use to anyone.' },
+        { id: 'x1', label: 'A rotation confirmation message appeared', detail: 'Access Desk', confirms: false, why: 'A message says it was requested, not that everything works.' },
+        { id: 'x2', label: 'The credential age shows 0 days', detail: 'Authentication Status Terminal', confirms: false, why: 'A fresh credential does not prove the old one is dead.' },
+        { id: 'x3', label: 'Other API routes were never interrupted', detail: 'Availability', confirms: false, why: 'Good scoping, but it does not prove this fix worked.' }] },
+    hintText: ['Prove two things: the new credential works, and the old one does not.', 'Test both the gateway and the downstream route.', 'Pick the gateway test, the route test and the 401 on the old credential.'],
+    clueOrder: ['ev_log'],
+    failureFeedback: { default: 'Choose only the evidence that proves the rotation worked.' },
+    successFeedback: 'Dependent services are updated and checked; the old token is rejected. Unrelated API routes remained available.',
+    actions: ['step:test_gateway', 'step:test_route', 'step:old_rejected'], requiredObjectives: ['p5', 'p6'], routeStateOnSuccess: { routeId: 'service_payment_intake', state: 'restored' } },
+];
+export default list;

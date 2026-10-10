@@ -20,6 +20,8 @@ import { loadToolIcons } from './icons';
 import { COACH } from '../data/coach';
 import { TeamPanel } from './teamPanel';
 import { BlueprintView } from './blueprint';
+import { IncidentBoardView } from './incidentBoard';
+import { IncidentBoard } from '../game/systems/Incidents';
 import { jev, type JevChoice } from '../integrations/jev/JevClient';
 import type { FabricSnapshot } from '../integrations/fabric';
 
@@ -39,6 +41,7 @@ export class UI {
   private pauseOpen = false;
   private teamPanel: TeamPanel | null = null;
   blueprint: BlueprintView | null = null;
+  board: IncidentBoardView | null = null;
   private panelOpen: string | null = null;
   private dirty = false;
   private mmTimer = 0;
@@ -230,7 +233,8 @@ export class UI {
     void this.refreshFabric();
     this.renderHud(); this.renderBelt(); this.renderInspect(); this.renderLog(); this.applySettings();
     state.speed = 1; scene.team.setCrew(settings.data.team);
-    this.blueprint = new BlueprintView(this.root, { state, runner, scene, toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
+    this.board = new IncidentBoardView(this.root, { state, runner, scene, toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; }, openMap: () => this.blueprint?.open('incident'), openDialog: (d) => this.openDialog(d) });
+    this.blueprint = new BlueprintView(this.root, { state, runner, scene, openBoard: () => this.board?.open(), toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
     this.teamPanel = new TeamPanel($(this.hud!, '#team')!, $(this.hud!, '#b-team')!, state, scene, { openDialog: (d) => this.openDialog(d), toast: (h, t) => this.toast(h, t) });
     const begin = () => this.showBriefing();
     let seen = false; try { seen = !!localStorage.getItem(SEEN_KEY); } catch { /* ignore */ }
@@ -240,7 +244,7 @@ export class UI {
 
   detachMission(): void {
     this.unsub.forEach((u) => u()); this.unsub = [];
-    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.teamPanel = null; document.body.classList.remove('team-open');
+    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.board?.close(); this.board = null; this.teamPanel = null; document.body.classList.remove('team-open');
     this.hud?.remove(); this.hud = null; this.state = null; this.runner = null; this.scene = null; this.dialogOpen = false; this.pauseOpen = false;
     $(this.root, '#dialog')?.remove(); $(this.root, '#panelmodal')?.remove();
   }
@@ -276,6 +280,7 @@ export class UI {
   togglePause(): void {
     if (!this.state || this.dialogOpen) return;
     if (this.blueprint?.isOpen) { this.blueprint.close(); return; }
+    if (this.board?.isOpen) { this.board.close(); return; }
     if (this.pauseOpen) { this.pauseOpen = false; this.clearScreen(); this.state.paused = false; return; }
     this.pauseOpen = true; this.state.paused = true;
     const s = this.showScreen(`<div class="card"><h2>Paused</h2><p>The incident clock is stopped.</p>
@@ -335,7 +340,7 @@ export class UI {
   private buildHud(): void {
     const hud = el('div', { id: 'hudroot' }, `
       <div id="hud"><div class="hud-row" id="meters"></div><div class="hud-row"><div id="objective" role="status" aria-live="polite"></div>
-        <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-blueprint" title="Facility map and systems blueprint (B)">\u{1F5FA} Blueprint</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-jev" class="hidden" title="JEV second opinions (AI) on or off" aria-pressed="false">JEV</button><button id="b-team" title="Team and Auto-play (T)">\u23F5 Auto</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
+        <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-board" title="Secure Ops Incident Board (I)">\u{1F4CB} Board</button><button id="b-blueprint" title="Facility map and systems blueprint (B)">\u{1F5FA} Blueprint</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-jev" class="hidden" title="JEV second opinions (AI) on or off" aria-pressed="false">JEV</button><button id="b-team" title="Team and Auto-play (T)">\u23F5 Auto</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
       <div id="tooltip"></div><div id="coach" class="hidden" role="region" aria-label="Tutorial coach"></div><div id="team" class="hidden" role="region" aria-label="Team and Auto-play"></div>
       <div id="belt" role="toolbar" aria-label="Tool belt"></div>
       <div id="inspect" class="open"></div>
@@ -349,6 +354,7 @@ export class UI {
     this.root.appendChild(hud); this.hud = hud;
     $(hud, '#b-goals')!.onclick = () => this.state && this.openDialog({ type: 'goals' });
     $(hud, '#b-conf')!.onclick = () => this.state && this.openDialog({ type: 'confidence' });
+    $(hud, '#b-board')!.onclick = () => this.openPanel('board');
     $(hud, '#b-blueprint')!.onclick = () => this.openPanel('blueprint');
     $(hud, '#b-map')!.onclick = () => this.openPanel('map');
     $(hud, '#b-fabric')!.onclick = () => this.openPanel('fabric');
@@ -589,8 +595,9 @@ export class UI {
   }
 
   // ===================================================================== panels ====
-  openPanel(kind: 'map' | 'log' | 'fabric' | 'blueprint'): void {
+  openPanel(kind: 'map' | 'log' | 'fabric' | 'blueprint' | 'board'): void {
     if (!this.hud || !this.state) return;
+    if (kind === 'board') { if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen) return; this.board?.toggle(); return; }
     if (kind === 'blueprint') { if (this.dialogOpen || this.pauseOpen) return; this.blueprint?.toggle(); return; }
     if (kind === 'log') { $(this.hud, '#logpanel')!.classList.toggle('hidden'); return; }
     if (kind === 'map') { const w = $(this.hud, '#minimap-wrap')!; if (document.body.classList.contains('phone-simple')) w.classList.toggle('force-open'); else w.classList.toggle('hidden'); return; }
@@ -687,9 +694,8 @@ export class UI {
       case 'alert': {
         const m = st.mission;
         card(`<div class="chip bad">❗ ${esc(m.alert.severity)} severity alert</div><h2 style="margin-top:6px">${esc(m.alert.headline)}</h2><ul>${m.alert.symptoms.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p><b>Likely impact:</b> ${esc(m.alert.impact)}</p><p><b>Points at:</b> ${esc(ROOM_BY_ID[m.alert.points].name)} (${esc(ROOM_BY_ID[m.alert.points].code)}). You hold an Ops Pass: request read-only passes at the Access Desk or a door reader as evidence points to each room.</p>
-          <h3>Service Confidence</h3>${this.measureBars(measuresOf(st))}<div class="row"><button class="primary" data-a="ok">Understood</button><button data-a="goals">Goals</button></div>`);
-        wrap.addEventListener('click', (e) => { if ((e.target as HTMLElement).dataset.a === 'goals') { close(); this.openDialog({ type: 'goals' }); } });
-        wrap.onclick = (e) => { if ((e.target as HTMLElement).dataset.a === 'ok') close(); };
+          <h3>Service Confidence</h3>${this.measureBars(measuresOf(st))}<div class="row"><button class="primary" data-a="ok">Understood</button>${IncidentBoard.for(st, this.runner!).defs.length ? '<button data-a="board">Open the Incident Board</button>' : ''}<button data-a="goals">Goals</button></div>`);
+        wrap.onclick = (e) => { const a = (e.target as HTMLElement).dataset.a; if (a === 'ok') close(); else if (a === 'goals') { close(); this.openDialog({ type: 'goals' }); } else if (a === 'board') { close(); this.board?.open(); } };
         break;
       }
       case 'confidence': {

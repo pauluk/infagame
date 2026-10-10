@@ -511,3 +511,151 @@ describe('facility graph', () => {
     const dg = incidentLink(MISSIONS.find((x) => x.id === 'duplicate-ghost')!); expect(dg.evidence.every((e) => e.at)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------- Incident Board ----
+import { INCIDENTS, INCIDENTS_BY_MISSION } from '../src/data/incidents';
+import { IncidentBoard } from '../src/game/systems/Incidents';
+import { KANBAN, KANBAN_RANK } from '../src/data/incidents/types';
+
+describe('incident board data', () => {
+  it('has unique IDs, valid links and every puzzle type is used', () => {
+    expect(new Set(INCIDENTS.map((i) => i.incidentId)).size).toBe(INCIDENTS.length);
+    expect(new Set(INCIDENTS.map((i) => i.puzzleType))).toEqual(new Set(['cable', 'match', 'missing', 'verify']));
+    for (const m of MISSIONS) {
+      const defs = INCIDENTS_BY_MISSION[m.id] ?? [];
+      if (m.order > 0) expect(defs.length, m.id).toBeGreaterThanOrEqual(3);
+      const ids = new Set(playbookFor(m).map((a) => a.id)), goals = new Set(m.goals.map((g) => g.id)), ev = new Set(m.evidence.map((e) => e.id));
+      for (const d of defs) {
+        const w = `${d.incidentId} (${m.id})`;
+        for (const a of [...d.actions, ...(d.fixActions ?? [])]) expect(ids.has(a), `${w}: action ${a}`).toBe(true);
+        for (const g of d.requiredObjectives) expect(goals.has(g), `${w}: goal ${g}`).toBe(true);
+        for (const e of d.evidenceIds) expect(ev.has(e), `${w}: evidence ${e}`).toBe(true);
+        const own = new Set(d.actions.map((a) => (m as any).spec?.steps.find((x: any) => `step:${x.id}` === a)?.evidence).filter(Boolean));
+        for (const e of d.evidenceIds) expect(own.has(e), `${w}: ${e} is produced by this incident's own actions, so the task could never open`).toBe(false);
+        for (const c of d.clueOrder) expect(!!(d.evidenceNotes[c] || ev.has(c)), `${w}: clue ${c}`).toBe(true);
+        for (const r of d.affectedRouteIds) expect(ROUTES.some((x) => x.id === r), `${w}: route ${r}`).toBe(true);
+        expect(ROOM_BY_ID[d.sourceRoom], w).toBeDefined(); expect(d.hintText.length, w).toBeGreaterThanOrEqual(3); expect(d.failureFeedback.default.length).toBeGreaterThan(10); expect(d.successFeedback.length).toBeGreaterThan(10);
+        const L: any = d.puzzlePieces; expect(L.type).toBe(d.puzzleType);
+        if (d.puzzleType === 'cable') {
+          const pid = new Map(L.ports.map((p: any) => [p.id, p.side]));
+          expect(d.validConnections!.length, w).toBeGreaterThanOrEqual(2);
+          for (const [f, t] of d.validConnections!) { expect(pid.get(f), w).toBe('source'); expect(pid.get(t), w).toBe('dest'); }
+          expect(L.ports.some((p: any) => p.side === 'dest' && !d.validConnections!.some(([, t]) => t === p.id)), `${w}: needs a decoy port`).toBe(true);
+        } else if (d.puzzleType === 'match') {
+          const pieces = new Set(L.pieces.map((p: any) => p.id)), slots = new Set(L.slots.map((p: any) => p.id));
+          for (const [p, sl] of Object.entries(d.correctMatches!)) { expect(pieces.has(p), `${w}: piece ${p}`).toBe(true); expect(slots.has(sl), `${w}: slot ${sl}`).toBe(true); }
+          expect(L.pieces.some((p: any) => !(p.id in d.correctMatches!)), `${w}: needs a decoy card`).toBe(true);
+          expect(new Set(L.pieces.map((p: any) => p.shape)).size, `${w}: distinct shapes`).toBeGreaterThanOrEqual(3);
+        } else if (d.puzzleType === 'missing') {
+          expect(L.items.filter((i: any) => i.problem).length, w).toBeGreaterThanOrEqual(1); expect(L.items.filter((i: any) => !i.problem && i.okWhy).length, w).toBeGreaterThanOrEqual(2);
+        } else {
+          expect(L.cards.filter((c: any) => c.confirms).length, w).toBeGreaterThanOrEqual(2); expect(L.cards.filter((c: any) => !c.confirms).length, w).toBeGreaterThanOrEqual(2);
+        }
+      }
+    }
+  });
+});
+
+/** Plays a mission with teammates on Auto, except the actions the board's puzzles carry out: the board solves those. */
+function boardRun(m: (typeof MISSIONS)[number]) {
+  const s = new GameState(m); const run = new MissionRunner(s); run.start();
+  const board = IncidentBoard.for(s, run);
+  const room = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+  const reserved = new Set(board.defs.flatMap((d) => d.actions));
+  const team = new TeamController(s, run, { team: true, spawn: [0, 1, 2, 3].map((i) => nearestWalkable(walk, room.x0 + 2 + i * 2, room.y0 + 4, 4)!), autoDecide: () => true, reserved });
+  team.setAllAuto(true);
+  const solved: Record<string, string | undefined> = {};
+  for (let t = 0; t < 12000 && !s.complete; t++) {
+    run.tick(0.25); team.update(0.25);
+    for (const d of board.defs) if (!board.puzzle(d.incidentId).solved && board.available(d)) {
+      for (let k = 0; k < 40 && !board.puzzle(d.incidentId).solved; k++) board.applyGuide(d);
+      expect(board.puzzle(d.incidentId).solved, d.incidentId).toBe(true);
+      const rs = d.routeStateOnSuccess; if (rs) solved[d.incidentId] = s.routeStates[rs.routeId];
+    }
+  }
+  if (!s.complete && process.env.DEBUG_BOARD) console.log(m.id, s.elapsed, team.outstanding().map((o) => `${o.a.id}:${o.state}:${o.why ?? o.by ?? ''}`).join(' | '), team.members.map((q) => q.note).join(' / '), board.defs.map((d) => d.incidentId + ':' + board.puzzle(d.incidentId).solved + ':' + (board.puzzle(d.incidentId).pending ?? '') + ':' + board.blockers(d).map((b) => b.text).join(',')).join(' ; '));
+  return { s, run, board, solved };
+}
+
+describe('incident board: puzzles change the real game', () => {
+  for (const m of MISSIONS.filter((x) => (INCIDENTS_BY_MISSION[x.id] ?? []).length)) {
+    it(`${m.title}: solving every board task (and letting the team do the rest) completes the mission and closes every card`, () => {
+      const { s, board, solved } = boardRun(m);
+      expect(s.complete, 'mission completed').toBe(true);
+      for (const g of m.goals.filter((x) => x.kind === 'primary')) expect(g.done(s), g.text).toBe(true);
+      for (const d of board.defs) {
+        expect(board.puzzle(d.incidentId).solved, d.incidentId).toBe(true);
+        expect(board.puzzle(d.incidentId).pending, d.incidentId).toBeUndefined();
+        expect(board.canMove(d, 'closed'), d.incidentId).toBe(true);
+        if (d.routeStateOnSuccess) expect(solved[d.incidentId], `${d.incidentId}: route ${d.routeStateOnSuccess.routeId} right after the task`).toBe(d.routeStateOnSuccess.state);
+      }
+    });
+  }
+});
+
+describe('incident board: wrong moves, hints and the Kanban rules', () => {
+  const dg = () => { const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!; const s = new GameState(m); const run = new MissionRunner(s); run.start(); return { m, s, run, board: IncidentBoard.for(s, run) }; };
+  it('a wrong placement explains the mismatch, keeps earlier progress and costs nothing', () => {
+    const { s, board } = dg(); const d = board.def('INC-101');
+    expect(board.place(d, 'a', 'orig').ok).toBe(true);
+    const bad = board.place(d, 'a', 'replay');
+    expect(bad.ok).toBe(false); expect(bad.text).toMatch(/first delivery/i);
+    expect(board.puzzle('INC-101').placements).toEqual({ a: 'orig' });           // nothing reset
+    expect(board.place(d, 'x', 'valid').text).toMatch(/not a receipt|total/i);   // a decoy card
+    expect(s.integrity).toBe(100); expect(s.protection).toBe(100); expect(s.stats.hintsUsed).toBe(0);
+  });
+  it('a wrong cable explains why and leaves the cables already made', () => {
+    const { board } = dg(); const d = board.def('INC-102');
+    expect(board.connect(d, 'valid', 'card').ok).toBe(true);
+    const bad = board.connect(d, 'replay', 'ledger');
+    expect(bad.ok).toBe(false); expect(bad.text).toMatch(/twice|duplicate/i);
+    expect(board.puzzle('INC-102').connections).toEqual([['valid', 'card']]);
+    expect(board.connect(d, 'card', 'valid').ok).toBe(false);                      // wrong direction
+    board.disconnect(d, 'valid', 'card'); expect(board.puzzle('INC-102').connections).toEqual([]);
+  });
+  it('findings and evidence choices are explained item by item and can be retried', () => {
+    const m = MISSIONS.find((x) => x.id === 'bacs-after-dark')!; const s = new GameState(m); const run = new MissionRunner(s); run.start(); const b = IncidentBoard.for(s, run);
+    const d = b.def('INC-202'); b.toggleMark(d, 'first'); b.toggleMark(d, 'hash');
+    const r = b.submitMissing(d); expect(r.ok).toBe(false); expect(r.text).toMatch(/First approval/); expect(r.text).toMatch(/still missing|out of place/);
+    expect(b.puzzle('INC-202').solved).toBe(false);
+    b.toggleMark(d, 'first'); expect(b.guide(d)).toEqual({ kind: 'mark', id: 'second' });
+  });
+  it('hints and "show me the next clue" progress and count as hints (never as penalties)', () => {
+    const { s, board } = dg(); const d = board.def('INC-102');
+    const h = [board.hint(d), board.hint(d), board.hint(d), board.hint(d)];
+    expect(h[0]).not.toBe(h[1]); expect(h[3]).toBe(h[2]);                         // the last hint repeats
+    expect(board.nextClue(d).id).toBe('ev_replay_trace'); expect(board.nextClue(d).id).toBe('ev_ledger_check');
+    expect(s.stats.hintsUsed).toBe(6); expect(s.integrity).toBe(100);
+    s.tutorial = true; board.hint(d); expect(s.stats.hintsUsed).toBe(6);
+  });
+  it('cards cannot skip prerequisites: the unmet one is named, and a card cannot be closed by dragging', () => {
+    const { s, run, board } = dg(); const d = board.def('INC-102');
+    expect(board.status(d)).toBe('new');
+    expect(board.canMove(d, 'triage')).toMatch(/Incident Wall/);
+    s.flags.briefed = true; expect(board.canMove(d, 'triage')).toBe(true);
+    expect(board.canMove(d, 'investigating')).toMatch(/Collect evidence/);
+    expect(board.canMove(d, 'closed')).toMatch(/Cannot move to Closed yet/);
+    expect(board.move(d, 'closed')).toMatch(/Cannot move/); expect(board.status(d)).toBe('triage');
+    expect(board.nextNeed(d).text).toMatch(/To move to Investigating: Collect evidence/);
+    s.evidence.add('ev_replay_trace'); expect(board.status(d)).toBe('investigating');
+    expect(board.canMove(d, 'contained')).toMatch(/Contain Receipt Event Feed/);
+    expect(board.canMove(d, 'verifying')).toMatch(/Cannot move to Verifying/);
+    void run;
+  });
+  it('moving back is always allowed (reopen) and does not lose progress', () => {
+    const { s, board } = dg(); const d = board.def('INC-101'); s.flags.briefed = true; s.evidence.add('ev_masked_receipt');
+    expect(board.status(d)).toBe('investigating'); expect(board.move(d, 'triage')).toBeNull(); expect(board.status(d)).toBe('triage');
+    expect(board.move(d, 'investigating')).toBeNull();
+    expect(KANBAN.map((c) => c.label)).toEqual(['New', 'Triage', 'Investigating', 'Contained', 'Fixing', 'Verifying', 'Closed']);
+    expect(KANBAN_RANK.closed).toBe(6);
+  });
+  it('a puzzle that is not ready names what is blocking it (and a pass is a blocker, not a penalty)', () => {
+    const { board } = dg(); const d = board.def('INC-102');
+    const b = board.blockers(d); expect(b.length).toBeGreaterThan(0); expect(board.available(d)).toBe(false);
+    expect(b.map((x) => x.text).join(' ')).toMatch(/Incident Wall|Collect evidence/);
+  });
+  it('the Control Room tutorial still works with the board: teammates skip nothing unless reserved', () => {
+    const { s, board } = dg(); expect(board.defs.length).toBe(3); expect(s.data.board).toBeDefined();
+    const hub = MISSIONS.find((x) => x.order === 0)!; const s2 = new GameState(hub); const r2 = new MissionRunner(s2); r2.start(); expect(IncidentBoard.for(s2, r2).defs.length).toBe(0);
+  });
+});

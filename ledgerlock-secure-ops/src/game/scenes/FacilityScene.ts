@@ -293,6 +293,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     kb.on('keydown-L', () => app.ui?.openPanel('log'));
     kb.on('keydown-R', () => this.setRoutesVisible(!this.flow.visible));
     kb.on('keydown-C', () => this.returnToPlayer());
+    kb.on('keydown-I', () => (document.getElementById('b-board') as HTMLElement | null)?.click());
     kb.on('keydown-B', () => (document.getElementById('b-blueprint') as HTMLElement | null)?.click());
     kb.on('keydown-T', () => (document.getElementById('b-team') as HTMLElement | null)?.click());
     kb.on('keydown-G', () => { if (!this.state.paused) app.ui?.openGoals(); });
