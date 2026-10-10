@@ -295,6 +295,33 @@ describe('Service Confidence and campaign storage', () => {
   });
 });
 
+describe('tutorial mode', () => {
+  it('coaches every guided step of The Duplicate Ghost with a valid target, tool and reason', async () => {
+    const { COACH } = await import('../src/data/coach');
+    const { describeTarget } = await import('../src/data/targets');
+    const entries = COACH['duplicate-ghost'];
+    for (const o of duplicateGhost.objectives) {
+      const c = entries[o.id]; expect(c, o.id).toBeDefined(); expect(c.why.length).toBeGreaterThan(30);
+      const s = new GameState(duplicateGhost);
+      const t = typeof c.target === 'function' ? c.target(s) : c.target;
+      for (const id of (Array.isArray(t) ? t : t ? [t] : [])) expect(describeTarget(id), `${o.id} -> ${id}`).not.toBeNull();
+    }
+  });
+  it('hints are free, incidents run slower and stretch goals are not counted while tutorial mode is on', () => {
+    const { s, run } = play(); s.tutorial = true;
+    run.api.say('x', 'y', 'warn', { hint: true }); expect(s.stats.hintsUsed).toBe(0);
+    const normal = play(); normal.run.api.say('x', 'y', 'warn', { hint: true }); expect(normal.s.stats.hintsUsed).toBe(1);
+    s.flags.briefed = true; normal.s.flags.briefed = true;
+    for (let i = 0; i < 40; i++) { run.tick(1); normal.run.tick(1); }
+    expect(s.elapsed).toBeLessThan(normal.s.elapsed);
+    const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
+    const t = runScript(MISSIONS.find((m) => m.id === 'bacs-after-dark') as ScenarioMission); t.s.tutorial = true;
+    expect(c.recordResult(t.s).goals.stretch).toEqual([]);
+    const u = runScript(MISSIONS.find((m) => m.id === 'bacs-after-dark') as ScenarioMission);
+    expect(new Campaign({ getItem: () => null, setItem: () => {}, removeItem: () => {} }).recordResult(u.s).goals.stretch.length).toBeGreaterThan(0);
+  });
+});
+
 describe('Fabric demo adapter', () => {
   it('works offline, is labelled Demo data, and reacts to paused mirroring', async () => {
     const a = new DemoFabricAdapter();

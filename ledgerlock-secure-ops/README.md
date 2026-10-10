@@ -15,7 +15,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # tsc --noEmit + vite build
 npm run preview    # serve the production build on http://localhost:4173
-npm run test       # 38 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
+npm run test       # 40 logic tests (map, passes, routes, every mission's scripted path, campaign storage, badges, scoring, Fabric demo adapter)
 npm run typecheck  # tsc --noEmit
 npm run test:e2e   # real-browser playthrough of the tutorial (needs `npm run preview` running and Playwright); also tests/e2e-campaign.mjs
 npm run assets:render   # OPTIONAL: re-render all sprites with Blender (see docs/art-pipeline.md)
@@ -44,6 +44,10 @@ Requires Node 20+ (developed on Node 22). `npm run assets:render` additionally n
 | Touch | On-screen pad and **E** button (auto-shown on touch devices; Settings -> Touch controls). Phone widths use a simplified HUD. |
 
 Accessibility: mute, **reduced motion** (no pulses/shakes/bobbing; route direction stays visible via arrows), relaxed pace (half-speed incidents), larger text. Status is never colour-only: every state has a label, icon or shape.
+
+### Tutorial mode
+Pick **Tutorial Mode** on the title screen (or tick it in the briefing, Settings or the pause menu). A coach card shows the current step, what to do, why it matters and which tool to use; a bouncing arrow marks the target and the tool belt highlights the tool. Hints are free, the clock runs slower, and stretch goals are not counted while it is on. It switches on automatically the first time you open Duplicate Ghost and can be turned off at any time.
+(Coaching is written for Duplicate Ghost; other missions show the normal guidance.)
 
 ## Campaign and missions
 

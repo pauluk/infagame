@@ -14,3 +14,6 @@
 **Touch.** Auto-enabled on coarse-pointer devices (Settings -> Accessibility -> Touch controls: Auto / Always on / Off): an on-screen pad, an **E** button and a pause button. Tap objects to select; tap the floor to walk. At phone widths (< 560 px) the HUD is simplified (fewer meters, the minimap and inspect panel collapse).
 
 **Tutorial.** A short "How to Play" card is shown the first time a mission starts and is always available from the title and pause menus.
+
+## Tutorial mode
+Optional coaching layer (`src/data/coach.ts`, `renderCoach` in `src/ui/ui.ts`). Setting: `tutorial` in `ledgerlock.settings.v1`. Free hints, 0.6x clock speed, stretch goals excluded from campaign results. Browser check: `tests/e2e-tutorial.mjs`.

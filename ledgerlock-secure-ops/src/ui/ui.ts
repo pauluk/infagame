@@ -17,6 +17,7 @@ import { describeTarget } from '../data/targets';
 import { app } from '../app';
 import { $, $$, el, esc, toneIcon } from './dom';
 import { loadToolIcons } from './icons';
+import { COACH } from '../data/coach';
 import type { FabricSnapshot } from '../integrations/fabric';
 
 const SEEN_KEY = 'ledgerlock.tutorialSeen';
@@ -77,6 +78,7 @@ export class UI {
         <p>You are a Secure Ops engineer. Walk the facility, follow the flow of money and events, investigate, contain with care, and keep valid services running.</p>
         <div class="menu">
           <button class="primary" data-a="start">▶ Start Shift <small style="opacity:.8">(The Duplicate Ghost, tutorial)</small></button>
+          <button data-a="tutorial">\u2691 Tutorial Mode <small style="opacity:.8">(guided coaching on The Duplicate Ghost)</small></button>
           <button data-a="missions">Mission Select</button>
           <button data-a="howto">How to Play</button>
           <button data-a="audio">Audio</button>
@@ -87,6 +89,7 @@ export class UI {
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
       if (a === 'start') this.startMission(this.nextMission().id);
+      if (a === 'tutorial') { settings.set('tutorial', true); this.startMission('duplicate-ghost'); }
       if (a === 'missions') this.showMissionSelect();
       if (a === 'howto') this.showHowTo(() => this.showTitle());
       if (a === 'audio') this.showSettings('audio', () => this.showTitle());
@@ -158,6 +161,7 @@ export class UI {
     const audio = `<h3>Audio</h3>${sw('s-mute', 'Mute sound effects', 'Short synthesised beeps. Nothing plays until you interact.', d.muted)}`;
     const access = `<h3>Accessibility</h3>
       ${sw('s-motion', 'Reduced motion', 'Stops pulses, shakes and bobbing. Route direction stays visible with arrows.', d.reducedMotion)}
+      ${sw('s-tut', 'Tutorial mode', 'Guided coaching: a step-by-step coach, a beacon on the target, free hints and slower incidents. Stretch goals are not counted.', d.tutorial)}
       ${sw('s-relaxed', 'Relaxed pace', 'Incidents progress at half speed.', d.relaxed)}
       ${sw('s-large', 'Larger text', 'Increases interface text size.', d.largeText)}
       <div class="sw"><label for="s-touch">Touch controls<small>On-screen pad and action buttons.</small></label><select id="s-touch" style="font:inherit;padding:6px;background:#132136;color:inherit;border:1px solid var(--line);border-radius:6px"><option value="auto">Auto</option><option value="on">Always on</option><option value="off">Off</option></select></div>`;
@@ -165,6 +169,7 @@ export class UI {
     const q = (id: string) => s.querySelector('#' + id) as HTMLInputElement | null;
     q('s-mute')?.addEventListener('change', (e) => settings.set('muted', (e.target as HTMLInputElement).checked));
     q('s-motion')?.addEventListener('change', (e) => settings.set('reducedMotion', (e.target as HTMLInputElement).checked));
+    q('s-tut')?.addEventListener('change', (e) => settings.set('tutorial', (e.target as HTMLInputElement).checked));
     q('s-relaxed')?.addEventListener('change', (e) => settings.set('relaxed', (e.target as HTMLInputElement).checked));
     q('s-large')?.addEventListener('change', (e) => settings.set('largeText', (e.target as HTMLInputElement).checked));
     const t = s.querySelector('#s-touch') as HTMLSelectElement | null; if (t) { t.value = d.touch; t.addEventListener('change', () => settings.set('touch', t.value as 'auto' | 'on' | 'off')); }
@@ -191,6 +196,7 @@ export class UI {
   attachMission(state: GameState, runner: MissionRunner, scene: SceneApi): void {
     this.detachMission();
     this.state = state; this.runner = runner; this.scene = scene;
+    state.tutorial = settings.data.tutorial;
     this.buildHud();
     this.unsub.push(
       state.on('change', () => { this.dirty = true; }),
@@ -219,6 +225,8 @@ export class UI {
 
   private showBriefing(): void {
     const st = this.state!; const m = st.mission;
+    // first ever run of the tutorial mission: switch coaching on (the player can untick it right here)
+    try { if (m.order === 1 && !campaign.isCompleted(m.id) && !localStorage.getItem('ledgerlock.tutorialPrompted')) { localStorage.setItem('ledgerlock.tutorialPrompted', '1'); settings.set('tutorial', true); } } catch { /* ignore */ }
     const s = this.showScreen(`<div class="card"><div class="chip warn">${esc(m.alert.severity)} severity · Incident briefing</div>
       <h2 style="margin-top:8px">${esc(m.title)}</h2>
       <div class="sub">${esc(m.alert.headline)}</div>
@@ -226,7 +234,9 @@ export class UI {
       <p><b>Likely impact:</b> ${esc(m.alert.impact)}</p>
       <p><b>Points at:</b> ${esc(ROOM_BY_ID[m.alert.points].name)} (${esc(ROOM_BY_ID[m.alert.points].code)})</p>
       ${m.briefing.map((b) => `<p>${esc(b)}</p>`).join('')}
+      <div class="sw"><label for="b-tut">Tutorial mode (guided coaching)<small>A coach explains each step and points at the target. Hints are free and incidents run slower.</small></label><input id="b-tut" type="checkbox" ${settings.data.tutorial ? 'checked' : ''} style="width:22px;height:22px"></div>
       <div class="row" style="margin-top:12px"><button class="primary" data-a="go">Begin investigation</button><button data-a="how">How to play</button></div></div>`);
+    (s.querySelector('#b-tut') as HTMLInputElement).addEventListener('change', (e) => settings.set('tutorial', (e.target as HTMLInputElement).checked));
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
       if (a === 'go') { this.clearScreen(); st.paused = false; st.log('Shift started. Coffee status: optimistic.', 'info'); }
@@ -242,12 +252,13 @@ export class UI {
     if (this.pauseOpen) { this.pauseOpen = false; this.clearScreen(); this.state.paused = false; return; }
     this.pauseOpen = true; this.state.paused = true;
     const s = this.showScreen(`<div class="card"><h2>Paused</h2><p>The incident clock is stopped.</p>
-      <div class="menu"><button class="primary" data-a="resume">Resume</button><button data-a="restart">Restart mission</button><button data-a="howto">How to Play</button><button data-a="settings">Audio and accessibility</button><button data-a="missions">Mission Select</button><button data-a="title">Quit to title</button></div></div>`);
+      <div class="menu"><button class="primary" data-a="resume">Resume</button><button data-a="restart">Restart mission</button><button data-a="tutorial">Tutorial mode: ${settings.data.tutorial ? 'ON (turn off)' : 'OFF (turn on)'}</button><button data-a="howto">How to Play</button><button data-a="settings">Audio and accessibility</button><button data-a="missions">Mission Select</button><button data-a="title">Quit to title</button></div></div>`);
     s.addEventListener('click', (e) => {
       const a = (e.target as HTMLElement).closest('button')?.dataset.a; if (!a) return; sfx.click();
       const mid = this.state!.mission.id;
       if (a === 'resume') this.togglePause();
       if (a === 'restart') { this.pauseOpen = false; this.startMission(mid); }
+      if (a === 'tutorial') { settings.set('tutorial', !settings.data.tutorial); this.pauseOpen = false; this.togglePause(); }
       if (a === 'howto') this.showHowTo(() => { this.pauseOpen = false; this.togglePause(); });
       if (a === 'settings') this.showSettings('all', () => { this.pauseOpen = false; this.togglePause(); });
       if (a === 'missions') { this.pauseOpen = false; this.leaveMissionVisuals(); this.showMissionSelect(); }
@@ -269,7 +280,7 @@ export class UI {
     const next = MISSIONS.filter((x) => x.order > 0).find((x) => x.order === m.order + 1);
     const evRows = m.evidence.map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(ROOM_BY_ID[e.sourceRoom].name)}</td><td>${esc(PASSES[e.requiredPass].name)}</td><td>${esc(e.sensitivity)}</td><td>${state.evidence.has(e.id) ? '<span class="chip good">✓ Collected</span>' : '<span class="chip">○ Missing</span>'}</td></tr>`).join('');
     const s = this.showScreen(`<div class="card wide"><div class="row" style="align-items:flex-start;gap:20px">
-      <div style="flex:1;min-width:280px"><div class="chip good">Mission complete</div><h2 style="margin-top:6px">${esc(m.title)}: debrief</h2>
+      <div style="flex:1;min-width:280px"><div class="chip good">Mission complete</div>${state.tutorial ? ' <span class="chip info">Tutorial mode: stretch goals not counted</span>' : ''}<h2 style="margin-top:6px">${esc(m.title)}: debrief</h2>
         ${m.order === 0 ? `<div class="score">${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}<span style="font-size:.35em;opacity:.8"> / 6 side tasks</span></div><div class="sub">Operations hygiene</div><p>Small habits prevent the next incident. Nothing here affects campaign progress.</p>` : `<div class="score">${score.total}<span style="font-size:.35em;opacity:.8"> / 100</span></div><div class="sub">${esc(score.rating)}</div><p>${esc(score.message)}</p>`}
         <h3>Objectives</h3><div class="small"><b>Primary</b></div><ul class="goals">${goalRows('primary') || '<li>None: this is a free-roam shift.</li>'}</ul>
         <div class="small"><b>Optional</b> (${m.goals.filter((g) => g.kind === 'optional' && g.done(state)).length}/${m.goals.filter((g) => g.kind === 'optional').length})</div><ul class="goals">${goalRows('optional')}</ul>
@@ -297,7 +308,7 @@ export class UI {
     const hud = el('div', { id: 'hudroot' }, `
       <div id="hud"><div class="hud-row" id="meters"></div><div class="hud-row"><div id="objective" role="status" aria-live="polite"></div>
         <div class="hud-btns"><button id="b-goals" title="Objectives and goals (G)">\u2691 Goals</button><button id="b-conf" title="Service Confidence">\u2630 Confidence</button><button id="b-map" title="Minimap (M)">▦ Map</button><button id="b-fabric" title="Fabric panel (F)">◈ Fabric</button><button id="b-log" title="Incident log (L)">☰ Log</button><button id="b-routes" title="Toggle route overlay (R)" aria-pressed="true">⤳ Routes</button><button id="b-mute" title="Mute sound">♪</button><button id="b-pause" title="Pause (Esc)">⏸</button></div></div></div>
-      <div id="tooltip"></div>
+      <div id="tooltip"></div><div id="coach" class="hidden" role="region" aria-label="Tutorial coach"></div>
       <div id="belt" role="toolbar" aria-label="Tool belt"></div>
       <div id="inspect" class="open"></div>
       <div id="minimap-wrap"><canvas id="mm" width="520" height="400" aria-label="Facility minimap"></canvas>
@@ -328,7 +339,7 @@ export class UI {
     });
     $(hud, '#mm')!.addEventListener('click', (e) => this.minimapClick(e as MouseEvent));
     $(hud, '#legend')!.innerHTML = [['cyan', 'API / events'], ['blue', 'Outbound payments'], ['mint', 'Card / return'], ['violet', 'Debt / agency'], ['periwinkle', 'Fabric analytics'], ['amber', 'Needs investigation'], ['coral', 'Confirmed threat']].map(([c, l]) => `<span><i style="background:${COLOR_HEX[c]}"></i>${l}</span>`).join('');
-    settings.on('change', () => { const b = $(hud, '#b-mute'); if (b) b.textContent = settings.data.muted ? '♪✕' : '♪'; });
+    settings.on('change', () => { if (this.state) { this.state.tutorial = settings.data.tutorial; this.dirty = true; } const b = $(hud, '#b-mute'); if (b) b.textContent = settings.data.muted ? '♪✕' : '♪'; });
     this.applySettings();
   }
 
@@ -369,14 +380,54 @@ export class UI {
     const cb = $(hud, '#b-conf'); if (cb) cb.textContent = `\u2630 Confidence ${overallConfidence(measuresOf(st))}%`;
     const pm = $(hud, '#b-routes'); if (pm) pm.setAttribute('aria-pressed', String(this.scene?.routesVisible() ?? true));
     this.renderPasses();
+    this.renderCoach();
   }
   private hintOpen = true;
+
+  /** Tutorial mode: coach card (what to do, why it matters, which tool) and a beacon on the target. */
+  private renderCoach(): void {
+    const st = this.state, hud = this.hud; if (!st || !hud) return;
+    const box = $(hud, '#coach')!, tip = $(hud, '#tooltip');
+    const on = st.tutorial && !st.complete;
+    box.classList.toggle('hidden', !on); tip?.classList.toggle('hidden', on);
+    document.body.classList.toggle('tutorial-on', on);
+    if (!on) { this.scene?.setCoachTargets([]); this.coachSig = ''; $$(hud, '.tool.coach').forEach((b) => b.classList.remove('coach')); return; }
+    const objs = this.runner!.objectives(); const idx = objs.findIndex((o) => !o.done); const cur = idx >= 0 ? objs[idx] : null;
+    const entry = cur ? COACH[st.mission.id]?.[cur.id] : undefined;
+    let tg = entry?.target; if (typeof tg === 'function') tg = tg(st) ?? undefined;
+    const targets = tg ? (Array.isArray(tg) ? tg : [tg]) : [];
+    const tool = entry?.tool ? TOOL_BY_ID[entry.tool] : null;
+    const sig = `${cur?.id}|${targets.join(',')}|${tool?.id}|${st.selectedTool}`;
+    if (sig === this.coachSig) return;
+    this.coachSig = sig;
+    this.scene?.setCoachTargets(targets);
+    $$(hud, '.tool').forEach((b) => b.classList.toggle('coach', !!tool && b.dataset.t === tool.id));
+    const need = tool && st.selectedTool !== tool.id;
+    box.innerHTML = cur ? `<div class="n">Tutorial \u00B7 step ${idx + 1} of ${objs.length}</div><div class="t">${esc(cur.text)}</div>
+      <div class="c"><b>Do this:</b> ${esc(cur.hint)}</div>
+      <div class="c"><b>Why:</b> ${esc(entry?.why ?? 'Follow the hint, then check the Goals list (G) to see how this fits the mission.')}</div>
+      ${tool ? `<div class="c"><b>Tool:</b> <kbd>${tool.key}</kbd> ${esc(tool.name)} ${need ? '<span class="chip warn">press ' + tool.key + ' to select it</span>' : '<span class="chip good">\u2713 selected: press E near the target</span>'}</div>` : ''}
+      <div class="row">${targets.length ? '<button data-c="show">Show me</button>' : ''}<button data-c="off">Turn tutorial mode off</button></div>`
+      : `<div class="n">Tutorial complete</div><div class="t">All steps done. File the report at the Evidence Board.</div>`;
+    $$(box, 'button').forEach((b) => (b.onclick = () => {
+      sfx.click();
+      if (b.dataset.c === 'off') settings.set('tutorial', false);
+      if (b.dataset.c === 'show' && targets[0]) {
+        this.scene?.focusOn(targets[0]);
+        const t = describeTarget(targets[0]); const room = t?.room?.id ?? (t?.prop ? t.prop.room : undefined);
+        if (room) this.guide(room as RoomId);
+        setTimeout(() => this.scene?.returnToPlayer(), 2600);
+      }
+    }));
+  }
+  private coachSig = '';
 
   private renderBelt(): void {
     const belt = this.hud && $(this.hud, '#belt'); if (!belt || !this.state) return;
     belt.innerHTML = TOOLS.map((t) => `<button class="tool" data-t="${t.id}" aria-pressed="${this.state!.selectedTool === t.id}" aria-label="${t.key}: ${esc(t.name)}. ${esc(t.blurb)}"><span class="k">${t.key}</span>${this.icons[t.sprite] ? `<img alt="" src="${this.icons[t.sprite]}">` : `<span class="glyph">${t.icon}</span>`}<span class="nm">${esc(t.short)}</span></button>`).join('');
     $$(belt, '.tool').forEach((b) => (b.onclick = () => this.selectTool(b.dataset.t as ToolId)));
     this.renderTooltip();
+    this.coachSig = ''; this.renderCoach();
   }
   selectTool(id: ToolId): void {
     if (!this.state) return;

@@ -36,7 +36,7 @@ export class MissionRunner {
       has: (k) => !!s.flags[k],
       say(title, text, tone = 'info', extra = {}) {
         s.latestResult = { title, text, tone, hint: extra.hint };
-        if (extra.hint) s.stats.hintsUsed++;
+        if (extra.hint && !s.tutorial) s.stats.hintsUsed++;
         s.emit('result', s.latestResult);
         s.log(`${title}: ${text}`, tone);
         s.changed();
@@ -86,7 +86,7 @@ export class MissionRunner {
   tick(dtReal: number): void {
     const s = this.s;
     if (s.paused || s.complete) return;
-    const dt = dtReal * this.timeScale;
+    const dt = dtReal * this.timeScale * (s.tutorial ? 0.6 : 1);
     s.elapsed += dt;
     for (const [k, h] of Object.entries(s.hits)) if (h.until && s.elapsed >= h.until) delete s.hits[k];
     for (const [p, until] of Object.entries(s.passExpiry)) if (s.elapsed >= until) { delete s.passExpiry[p]; s.passes.delete(p as PassId); s.flags['expired_' + p] = true; s.log(`${PASSES[p as PassId].name} expired (time-limited).`, 'info'); s.emit('pass', { pass: p as PassId, granted: false }); }

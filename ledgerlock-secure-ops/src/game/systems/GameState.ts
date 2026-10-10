@@ -58,6 +58,8 @@ export class GameState extends Emitter<StateEvents> {
   selectedTool: ToolId = 'scanner';
   selectedTarget: string | null = null;
   paused = false;
+  /** Tutorial mode: guided coaching, hints are free, incidents run slower, stretch goals are not counted. */
+  tutorial = false;
   complete = false;
   fabricSnapshot: FabricSnapshot | null = null;
   latestResult: ResultCard | null = null;

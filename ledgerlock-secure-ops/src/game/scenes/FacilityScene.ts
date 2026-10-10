@@ -61,6 +61,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private guideUntil = 0;
   private guideCells: Cell[] = [];
   private highlight!: Phaser.GameObjects.Graphics;
+  private coach!: Phaser.GameObjects.Graphics;
+  private coachTargets: string[] = [];
   private wallBoard!: Phaser.GameObjects.Text;
   private wallSig = '';
   private unsub: (() => void)[] = [];
@@ -71,6 +73,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
 
   init(data: { mission: MissionDef; relaxed?: boolean }): void {
     this.state = new GameState(data.mission, data.relaxed ?? settings.data.relaxed);
+    this.state.tutorial = settings.data.tutorial;
     this.runner = new MissionRunner(this.state);
   }
 
@@ -85,6 +88,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.flow = new FlowRenderer(this);
     this.guide = this.add.graphics().setDepth(19000);
     this.highlight = this.add.graphics().setDepth(19500);
+    this.coach = this.add.graphics().setDepth(21800);
     this.buildPlayer();
     this.buildInput();
     this.buildCamera();
@@ -280,6 +284,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     if (g) { this.guideCells = g.path; this.guideUntil = this.time.now + 14000; }
     return g;
   }
+  setCoachTargets(ids: string[]): void { this.coachTargets = ids; }
   setRoutesVisible(v: boolean): void { this.flow.setVisible(v); }
   routesVisible(): boolean { return this.flow.visible; }
   focusOn(target: string): void {
@@ -580,6 +585,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.updateHighlight(time);
     this.fadeWalls();
     this.drawGuide(time);
+    this.drawCoach(time);
     if (this.state.complete && !this.state.flags._debriefed) { this.state.flags._debriefed = true; this.time.delayedCall(1800, () => app.openDebrief(this.state)); }
   }
 
@@ -616,6 +622,30 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       const dx = w.gx - px, dy = w.gy - py;
       const near = behind && dx >= -0.6 && dy >= -0.6 && (dx < 0.4 || dy < 0.4);
       w.img.setAlpha(near ? 0.4 : 1);
+    }
+  }
+
+  /** Tutorial-mode beacon: a bouncing arrow and a pulsing ring on the coached target(s). */
+  private drawCoach(time: number): void {
+    const g = this.coach; g.clear();
+    if (!this.state.tutorial || !this.coachTargets.length) return;
+    const reduced = settings.data.reducedMotion;
+    for (const id of this.coachTargets) {
+      const pos = this.targetPos(id); if (!pos) continue;
+      const t = describeTarget(id);
+      const bob = reduced ? 0 : Math.sin(time / 180) * 5, ring = reduced ? 1 : 1 + 0.12 * Math.sin(time / 220);
+      const top = pos.y - (t?.prop ? 78 : t?.door ? 52 : 40) + bob;
+      g.fillStyle(0x0b1424, 0.95).fillTriangle(pos.x - 11, top - 20, pos.x + 11, top - 20, pos.x, top + 2);
+      g.fillStyle(C.amber, 1).fillTriangle(pos.x - 8, top - 18, pos.x + 8, top - 18, pos.x, top - 2);
+      if (t?.room) {
+        const r = t.room, a = this.S(r.x0, r.y0), b = this.S(r.x0 + r.w, r.y0), c = this.S(r.x0 + r.w, r.y0 + r.h), d = this.S(r.x0, r.y0 + r.h);
+        g.lineStyle(3, C.amber, 0.9).beginPath().moveTo(a.x, a.y).lineTo(b.x, b.y).lineTo(c.x, c.y).lineTo(d.x, d.y).closePath().strokePath();
+      } else if (t?.route) {
+        g.lineStyle(3, C.amber, 0.9).strokeCircle(pos.x, pos.y, 14 * ring);
+      } else {
+        const w = (TILE_W / 2) * 1.15 * ring, h = (TILE_H / 2) * 1.15 * ring, y0 = pos.y;
+        g.lineStyle(3, C.amber, 0.95).beginPath().moveTo(pos.x, y0 - h).lineTo(pos.x + w, y0).lineTo(pos.x, y0 + h).lineTo(pos.x - w, y0).closePath().strokePath();
+      }
     }
   }
 

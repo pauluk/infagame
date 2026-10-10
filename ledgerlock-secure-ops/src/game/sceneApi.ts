@@ -12,4 +12,6 @@ export interface SceneApi {
   setRoutesVisible(v: boolean): void;
   routesVisible(): boolean;
   focusOn(target: string): void;
+  /** Tutorial mode: pulse a beacon on these targets (empty array clears it). */
+  setCoachTargets(ids: string[]): void;
 }

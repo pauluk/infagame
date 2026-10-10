@@ -33,7 +33,7 @@ Every room is restricted. A door cell is walkable only if the player holds that 
 | fabric_platform | fabric_observer_pass | Read-only synthetic Bronze/Silver/Gold pipeline status |
 | integration_exchange | integration_audit_pass | Read-only transfer status and routing metadata |
 
-Passes can also be **revoked** from the Access Desk (least privilege; raises Data protection). Mission 6 adds one special pass, `token_rotation_pass`: a time-limited approval (20 game minutes) that opens no door and is needed to rotate the simulated token at the Access Desk. Requesting a pass a mission does not need costs Data protection.
+Passes can also be **revoked** from the Access Desk (least privilege; raises Data protection). Mission 6 adds one special pass, `token_rotation_pass`: a time-limited approval (12 game minutes) that opens no door and is needed to rotate the simulated token at the Access Desk. Requesting a pass a mission does not need costs Data protection.
 
 Passes are fictional, mission-scoped and read-only; `GameState.passes` is created per mission, so they expire when the mission ends. A request is granted only when the mission's `passGrants` rule says current evidence justifies it; otherwise the player sees a denial and a hint. Evidence retrieval also checks the pass, so nothing can be read remotely.
 

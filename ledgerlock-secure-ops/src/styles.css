@@ -183,3 +183,14 @@ body.touch-on #touch .dpad { bottom: 84px; } body.touch-on #touch .act { bottom:
 ul.goals { list-style: none; margin: 4px 0 8px; padding: 0; } ul.goals li { margin: 3px 0; line-height: 1.35; }
 .mcard.locked { opacity: .65; }
 @media (max-width: 560px) { .mrow { grid-template-columns: 120px 1fr 40px; } .mrow small { display: none; } #b-conf { display: none; } }
+
+/* ---------- tutorial mode ---------- */
+#coach { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%); width: min(660px, 94vw); background: var(--panel); border: 2px solid var(--amber); border-radius: 12px; padding: 9px 13px; z-index: 12; }
+#coach .n { font-size: .78em; color: var(--amber); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+#coach .t { font-weight: 800; margin: 2px 0; } #coach .c { margin: 3px 0; line-height: 1.35; font-size: .93em; }
+#coach .row { margin-top: 6px; } #coach button { padding: 4px 10px; min-height: 30px; }
+.tool.coach { outline: 3px dashed var(--amber); outline-offset: 2px; }
+.tool.coach::before { content: '\2605'; position: absolute; top: -9px; right: -5px; color: var(--amber); font-size: 18px; }
+body.tutorial-on #inspect { max-height: calc(100vh - 380px); }
+@media (max-width: 1100px) { #coach { bottom: 84px; width: min(560px, 60vw); font-size: .9em; } }
+@media (max-width: 560px) { #coach { width: calc(100vw - 16px); top: 200px; bottom: auto; max-height: 32vh; overflow: auto; } #coach .c:nth-of-type(2) { display: none; } }
