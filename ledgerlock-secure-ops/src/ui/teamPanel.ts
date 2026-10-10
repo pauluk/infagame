@@ -1,7 +1,8 @@
 import type { DialogSpec, Tone } from '../game/types';
 import type { GameState } from '../game/systems/GameState';
 import type { SceneApi } from '../game/sceneApi';
-import type { InboxItem, Member } from '../game/systems/Team';
+import { EFFORT_BUDGET, fatigueOf, type InboxItem, type Member, type Question } from '../game/systems/Team';
+import type { PlayAction } from '../game/systems/Playbook';
 import { settings } from '../game/systems/Settings';
 import { sfx } from '../game/systems/Sfx';
 import { TOOL_BY_ID } from '../data/tools';
@@ -45,7 +46,7 @@ export class TeamPanel {
     document.body.classList.toggle('team-open', this.open && !s.complete);
     if (!this.open) return;
     const sug = t.crew.map((m) => t.suggestion(m)?.id ?? '-').join(',');
-    const sig = [crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '') + (i.text?.length ?? 0)).slice(0, 8).join(',')].join(';');
+    const sig = [crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}${Math.round(m.focus / 4)}${m.resting}${Math.round(m.spent)}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '') + (i.text?.length ?? 0)).slice(0, 8).join(',')].join(';');
     if (sig === this.sig) return;
     this.sig = sig; this.render();
   }
@@ -59,15 +60,20 @@ export class TeamPanel {
       const sug = crew ? t.suggestion(m) : null;
       const sel = s.selectedTarget, tg = sel ? describeTarget(sel) : null, tool = TOOL_BY_ID[s.selectedTool];
       const pend = m.pending && !m.pending.resolved;
+      const fat = fatigueOf(m.focus), focus = Math.round(m.focus);
+      const adhoc = (tool: 'e' | typeof s.selectedTool): PlayAction => ({ id: 'q', label: '', role: 'investigator', kind: 'use', target: sel ?? undefined, tool, after: [], done: () => false, ready: () => true });
+      const price = (a: PlayAction) => { const q = t.quote(m, a); return `${q.cost} effort \u00B7 ~${q.seconds}s${q.specialist ? '' : ' \u00B7 not their specialty (\u00D71.5)'}${q.enough ? '' : ' \u00B7 too tired: needs a break'}`; };
       return `<div class="tm ${m.phase}${pend ? ' ask' : ''}" data-m="${m.id}">
         <i class="dot" style="background:#${m.color.toString(16).padStart(6, '0')}"></i>
-        <div class="who"><b>${esc(m.name)}</b> <small>${esc(m.title)}</small><div class="st">${esc(m.note)}</div></div>
+        <div class="who"><b>${esc(m.name)}</b> <small>${esc(m.title)}</small><div class="st">${esc(m.note)}</div>
+          ${crew ? `<div class="meter ${fat}" role="meter" aria-label="${esc(m.name)}'s Focus" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${focus}"><i style="width:${focus}%"></i></div><small class="fx">Focus ${focus}% \u00B7 ${fat === 'fresh' ? 'Fresh' : fat === 'steady' ? 'Steady' : fat === 'tired' ? 'Tired (slower)' : 'Exhausted'}${m.resting ? ' \u00B7 on a break' : ''} \u00B7 spent ${Math.round(m.spent)} effort</small>` : ''}</div>
         <label class="auto" title="Auto: ${crew ? m.name + ' picks the next best task and carries it out' : 'your avatar follows the playbook; move or click to take over'}"><input type="checkbox" data-t="auto" ${m.auto ? 'checked' : ''}> Auto</label>
         <button data-t="more" aria-expanded="${ext}" title="Orders">${ext ? '▴' : '▾'}</button>
         ${ext ? `<div class="ord">
-          ${crew ? `<button data-t="sugg" ${sug ? '' : 'disabled'} title="Give ${esc(m.name)} the next task for their role">▶ ${sug ? esc(sug.label) : 'Nothing ready for them'}</button>
-          <button data-t="send" ${tg ? '' : 'disabled'} title="Select a tool on the belt and a target on the map first">Use ${esc(tool.name)} → ${tg ? esc(tg.name) : 'select a target'}</button>
-          <button data-t="read" ${tg && tg.kind !== 'room' && tg.kind !== 'route' ? '' : 'disabled'}>Read / use (no tool) → ${tg ? esc(tg.name) : '…'}</button>` : ''}
+          ${crew ? `<button data-t="sugg" ${sug ? '' : 'disabled'} title="Give ${esc(m.name)} the next task for their role">▶ ${sug ? `${esc(sug.label)}<small class="cost">${esc(price(sug))}</small>` : 'Nothing ready for them'}</button>
+          <button data-t="send" ${tg ? '' : 'disabled'} title="Select a tool on the belt and a target on the map first">Use ${esc(tool.name)} → ${tg ? `${esc(tg.name)}<small class="cost">${esc(price(adhoc(s.selectedTool)))}</small>` : 'select a target'}</button>
+          <button data-t="read" ${tg && tg.kind !== 'room' && tg.kind !== 'route' ? '' : 'disabled'}>Read / use (no tool) → ${tg ? `${esc(tg.name)}<small class="cost">${esc(price(adhoc('e')))}</small>` : '…'}</button>
+          <span class="row ask" role="group" aria-label="Ask ${esc(m.name)}"><small>Ask:</small>${([['status', 'Status?'], ['recommend', 'What now?'], ['blocked', 'Blocked?'], ['feeling', 'How are you?']] as [Question, string][]).map(([q, l]) => `<button data-t="ask" data-q="${q}">${l}</button>`).join('')}<button data-t="rest" title="Focus recovers fast on a break; they take no work meanwhile">☕ Break</button></span>` : ''}
           <span class="row"><button data-t="look">Look</button><button data-t="stop">Stop</button></span></div>` : ''}
       </div>`;
     };
@@ -76,7 +82,7 @@ export class TeamPanel {
     this.box.innerHTML = `<div class="th"><b>${crewOn ? 'Team' : 'Auto-play'}</b><span class="spd" role="group" aria-label="Speed">${[1, 2, 4].map((n) => `<button data-t="speed" data-n="${n}" aria-pressed="${s.speed === n}">${n}×</button>`).join('')}</span><button data-t="close" aria-label="Hide panel">×</button></div>
       <label class="sw2"><input type="checkbox" data-t="crew" ${crewOn ? 'checked' : ''}> Team on duty (Manager mode)</label>
       <label class="sw2"><input type="checkbox" data-t="decide-all" ${settings.data.autoDecide ? 'checked' : ''}> ${crewOn ? 'Let the team make the calls' : 'Let Auto-play make the calls'}</label>
-      ${crewOn ? `<div class="row"><button data-t="allauto">Everyone on Auto</button><button data-t="allstop">Everyone stop</button></div>` : ''}
+      ${crewOn ? `<div class="budget" aria-label="Team effort"><div class="bh"><b>Team effort</b><span>${t.spent} / ${EFFORT_BUDGET}${t.overtime ? ` · <b class="ot">overtime ${t.overtime}</b>` : ''}</span></div><div class="meter ${t.overtime ? 'exhausted' : t.spent > EFFORT_BUDGET * 0.8 ? 'tired' : 'fresh'}" role="meter" aria-label="Effort budget used" aria-valuemin="0" aria-valuemax="${EFFORT_BUDGET}" aria-valuenow="${Math.min(t.spent, EFFORT_BUDGET)}"><i style="width:${Math.min(100, (t.spent / EFFORT_BUDGET) * 100)}%"></i></div><small>Every task costs effort (shown on each order). Specialists are efficient; covering costs half as much again. Tired people are slower: give them breaks.</small></div><div class="row"><button data-t="allauto">Everyone on Auto</button><button data-t="allstop">Everyone stop</button></div>` : ''}
       <div class="ib">${inbox.length ? inbox.map(item).join('') : '<small class="muted">No messages. Teammates ask here when a choice is yours to make.</small>'}</div>
       ${members.map(card).join('')}
       <small class="muted">${s.stats.autoActions ? `Auto has done ${s.stats.autoActions} action(s): stretch goals are not counted this run.` : 'Stretch goals are earned by hand: they are not counted if Auto does any of the work.'}</small>`;
@@ -105,6 +111,8 @@ export class TeamPanel {
       case 'more': if (m) this.more = this.more === m.id ? null : m.id; break;
       case 'look': if (m) this.scene.focusMember(m.id); setTimeout(() => this.scene.returnToPlayer(), 2600); break;
       case 'stop': if (m) t.recall(m.id); break;
+      case 'ask': { if (m) { const it = t.question(m.id, b.dataset.q as Question); if (it) this.host.toast(`<b>${esc(it.member)}:</b> ${esc(it.text ?? '')}`, 'info'); } break; }
+      case 'rest': if (m) t.rest(m.id); break;
       case 'allauto': t.setAllAuto(true); break;
       case 'allstop': t.setAllAuto(false); for (const x of t.crew) t.recall(x.id); break;
       case 'sugg': { const a = m && t.suggestion(m); if (m && a) { const err = t.order(m.id, { actionId: a.id }); if (err) this.host.toast(esc(err), 'warn'); } break; }

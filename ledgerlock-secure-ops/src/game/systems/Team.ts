@@ -27,7 +27,22 @@ export interface Member {
   claimed: string | null;
   fails: Record<string, number>; coolUntil: Record<string, number>; idleFor: number;
   external?: ExternalBody; walkIssued?: boolean; pending?: InboxItem | null; done: number;
+  /** Manager mode resources: Focus (0-100) is spent as effort and recovers while idle or on a break. */
+  focus: number; resting: boolean; spent: number; breaks: number;
 }
+export type Fatigue = 'fresh' | 'steady' | 'tired' | 'exhausted';
+/** Effort units per action (before the specialist adjustment). One unit costs one point of Focus. */
+const BASE_COST: Record<string, number> = { e: 3, scanner: 4, lens: 6, patch: 9, restore: 9, recon: 8, token: 8, quarantine: 10, reroute: 8, pass: 3, record: 3, report: 5 };
+export const EFFORT_BUDGET = 100;          // team effort available this shift before it turns into overtime
+export const TIRED_AT = 35, EXHAUSTED_AT = 8, REST_UNTIL = 75, WALK_EFFORT = 0.2, IDLE_RECOVERY = 1.6, REST_RECOVERY = 7;
+export const fatigueOf = (f: number): Fatigue => (f <= EXHAUSTED_AT ? 'exhausted' : f < TIRED_AT ? 'tired' : f < 70 ? 'steady' : 'fresh');
+/** Effort an action costs a member. Specialists are efficient; covering for someone else costs half as much again. */
+export function effortCost(a: PlayAction, m: Pick<Member, 'role'>): number {
+  const base = a.kind === 'use' || a.kind === 'contain' || a.kind === 'release' || a.kind === 'reroute' ? BASE_COST[a.kind === 'use' ? String(a.tool) : a.kind === 'contain' || a.kind === 'release' ? 'quarantine' : 'reroute'] ?? 5 : BASE_COST[a.kind] ?? 3;
+  return Math.ceil(base * (m.role === 'any' || a.role === m.role ? 1 : 1.5));
+}
+export interface Quote { cost: number; seconds: number; specialist: boolean; enough: boolean; fatigue: Fatigue; walk: number }
+export type Question = 'status' | 'recommend' | 'blocked' | 'feeling';
 export interface InboxItem {
   id: number; member: string; kind: 'decision' | 'report' | 'alert'; title: string; text?: string; t: string;
   spec?: DialogSpec; resolved?: boolean;
@@ -75,6 +90,7 @@ export class TeamController {
     const mk = (id: string, name: string, role: Role | 'any', title: string, color: number, cell: Cell, external?: ExternalBody): Member => ({
       id, name, role, title, color, auto: false, pos: { x: cell.x + 0.5, y: cell.y + 0.5 }, facing: 'se', path: [], phase: 'idle', note: 'Standing by',
       moving: false, task: null, manual: false, workLeft: 0, settle: 0, claimed: null, fails: {}, coolUntil: {}, idleFor: 0, external, pending: null, done: 0,
+      focus: 100, resting: false, spent: 0, breaks: 0,
     });
     this.members.push(mk('you', 'You', 'any', 'Manager', 0xf5c542, opts.spawn[0], opts.body));
     this.crewOn = opts.team;
@@ -116,9 +132,10 @@ export class TeamController {
       a = { id: 'manual:' + ++this.manualSeq, label: tool === 'e' ? `Inspect ${t.name}` : `${TOOL_BY_ID[tool].name} on ${t.name}`, role: 'investigator', kind: 'use', target: o.target, tool, after: [], done: () => false, ready: () => true };
     }
     if (!a) return 'That task is no longer available.';
-    this.release(m);
+    if (fatigueOf(m.focus) === 'exhausted') return `${m.name} is exhausted (Focus ${Math.round(m.focus)}%). Give them a break first.`;
+    this.release(m); m.resting = false;
     m.task = a; m.manual = true; m.fails = {}; this.begin(m);
-    this.s.stats.orders++; this.s.log(`${this.s.fmtClock()} ${m.name} ordered: ${a.label}.`, 'info');
+    this.s.stats.orders++; this.s.log(`${this.s.fmtClock()} ${m.name} ordered: ${a.label} (about ${effortCost(a, m)} effort).`, 'info');
     this.s.changed();
     return null;
   }
@@ -126,6 +143,48 @@ export class TeamController {
     const m = this.member(id); if (!m) return;
     this.release(m); this.stop(m, m.auto ? 'Looking for work' : 'Standing by');
     if (m.external) m.external.cancel();
+  }
+  /** Send a teammate on a break: Focus recovers quickly, and they take no work until they are back up. */
+  rest(id: string): void {
+    const m = this.member(id); if (!m || m.id === 'you' || !this.crewOn) return;
+    this.release(m); m.path = []; m.phase = 'idle'; m.resting = true; m.breaks++; this.s.stats.breaks++; m.note = 'On a break: recovering Focus';
+    this.s.log(`${m.name} takes a break.`, 'info'); this.s.changed();
+  }
+  get spent(): number { return Math.round(this.crew.reduce((n, m) => n + m.spent, 0) * 10) / 10; }
+  get overtime(): number { return Math.max(0, Math.round((this.spent - EFFORT_BUDGET) * 10) / 10); }
+  /** What an action would cost this member: effort, time and whether they are fit to do it. Shown before any order is given. */
+  quote(m: Member, a: PlayAction): Quote {
+    const cost = effortCost(a, m), fatigue = fatigueOf(m.focus), cell = this.cellOf(m);
+    const key = `${m.id}|${a.id}|${cell.x},${cell.y}|${[...this.s.passes].length}`;
+    let walk = this.walkCache.get(key);
+    if (walk === undefined) { const st = a.target ? standFor(a.target, cell, this.s.passes) : { path: [] as Cell[] }; walk = st ? st.path.length : 0; if (this.walkCache.size > 400) this.walkCache.clear(); this.walkCache.set(key, walk); }
+    const work = (a.kind === 'contain' || a.kind === 'release' ? 1.6 : 1.1) * (m.role === 'any' || a.role === m.role ? 1 : 1.8) * (fatigue === 'tired' ? 1.5 : 1);
+    return { cost, walk, seconds: Math.round(walk / WALK_SPEED + work), specialist: m.role === 'any' || a.role === m.role, enough: m.focus >= cost, fatigue };
+  }
+  private walkCache = new Map<string, number>();
+  /** Ask a teammate a question. The answer arrives as a message; asking costs them a moment of attention, never effort. */
+  question(id: string, q: Question): InboxItem | null {
+    const m = this.member(id); if (!m || m.id === 'you' || !this.crewOn) return null;
+    const s = this.s, fat = fatigueOf(m.focus), focus = Math.round(m.focus);
+    let text = '', title = '';
+    if (q === 'status') {
+      title = 'Status';
+      text = m.resting ? `On a break (Focus ${focus}%).` : m.task ? `${m.phase === 'working' ? 'Working on' : m.phase === 'walking' ? 'Heading to do' : m.phase === 'waiting' ? 'Waiting for you on' : 'On'}: ${m.task.label}. About ${this.quote(m, m.task).cost} effort. Focus ${focus}% (${fat}).` : `Standing by. Focus ${focus}% (${fat}).`;
+    } else if (q === 'recommend') {
+      title = 'Recommendation';
+      const a = this.suggestion(m);
+      if (!a) { const blocked = this.outstanding().find((o) => o.state === 'blocked'); text = blocked ? `Nothing is ready for me. Next up, "${blocked.a.label}", is waiting: ${blocked.why}.` : 'Nothing left to do, as far as I can see.'; }
+      else { const qt = this.quote(m, a); text = `I would ${a.label}. About ${qt.cost} effort and ${qt.seconds}s${qt.specialist ? ' (my specialty)' : ': not my specialty, so it costs half as much again. Someone else may be better placed'}.${qt.enough ? '' : ' I do not have the Focus for it right now: I need a break first.'}`; }
+    } else if (q === 'blocked') {
+      title = 'Blockers';
+      text = m.phase === 'blocked' ? m.note : m.pending && !m.pending.resolved ? `I am waiting for your call: ${m.pending.title}.` : (() => { const b = this.outstanding().find((o) => o.state === 'blocked'); return b ? `Nothing blocks me, but "${b.a.label}" cannot start yet: ${b.why}.` : 'Nothing is blocking me.'; })();
+    } else {
+      title = 'How are you?';
+      text = fat === 'exhausted' ? `I am spent (Focus ${focus}%). Please send me on a break.` : fat === 'tired' ? `Getting tired (Focus ${focus}%): I am slower now. A short break would help.` : fat === 'steady' ? `Fine (Focus ${focus}%).` : `Fresh (Focus ${focus}%).`;
+    }
+    if (m.phase === 'working') m.workLeft += 0.6;                // an interruption costs a moment
+    const it: InboxItem = { id: ++this.seq, member: m.name, kind: 'report', title: `${title}?`, text, t: s.fmtClock() };
+    this.push(it); return it;
   }
   dismiss(itemId: number): void {
     const it = this.inbox.find((x) => x.id === itemId); if (!it) return;
@@ -231,11 +290,11 @@ export class TeamController {
     const s = this.s; if (s.complete) return;
     this.tickWaits();
     for (const m of this.live()) {
-      if (m.external) m.pos = m.external.pos();
+      if (m.external) m.pos = m.external.pos(); else if (m.id !== 'you') this.recover(m, dt);
       switch (m.phase) {
         case 'idle': this.idle(m, dt); break;
         case 'walking': this.walk(m, dt); break;
-        case 'working': m.workLeft -= dt; if (m.workLeft <= 0) this.perform(m); break;
+        case 'working': m.workLeft -= m.id === 'you' ? dt : dt / (fatigueOf(m.focus) === 'tired' ? 1.5 : 1); if (m.workLeft <= 0) this.perform(m); break;
         case 'settle': m.settle -= dt; if (m.settle <= 0) this.afterPerform(m); break;
         case 'waiting': if (!m.pending || m.pending.resolved) { m.pending = null; m.phase = 'settle'; m.settle = 0.5; m.note = 'Checking the result'; } break;
         case 'blocked': m.idleFor += dt; if (m.idleFor > 6) this.stop(m, m.auto ? 'Looking for work' : 'Standing by'); break;
@@ -244,11 +303,21 @@ export class TeamController {
     }
   }
 
+  /** Focus returns while idle or blocked, and much faster on a break. Walking and working are paid for per action instead. */
+  private recover(m: Member, dt: number): void {
+    if (m.resting) { m.focus = Math.min(100, m.focus + REST_RECOVERY * dt); if (m.focus >= REST_UNTIL) { m.resting = false; m.note = m.auto ? 'Looking for work' : 'Back from the break'; this.s.changed(); } return; }
+    if (m.phase === 'idle' || m.phase === 'blocked' || m.phase === 'waiting') m.focus = Math.min(100, m.focus + IDLE_RECOVERY * dt);
+  }
+  private spend(m: Member, n: number): void { if (m.id === 'you') return; m.focus = Math.max(0, m.focus - n); m.spent += n; this.s.stats.effort = Math.round((this.s.stats.effort + n) * 10) / 10; }
+
   private idle(m: Member, dt: number): void {
+    if (m.resting) return;
     if (m.task) return this.begin(m);
     if (!m.auto) return;
     m.idleFor += dt; if (m.idleFor < 0.4) return;
-    const pick = this.available(m)[0];
+    if (m.id !== 'you' && m.focus < 15) { this.rest(m.id); return; }                      // Auto teammates look after themselves
+    const pick = this.available(m).find((a) => m.id === 'you' || m.focus >= effortCost(a, m)) ?? null;
+    if (!pick && m.id !== 'you' && this.available(m).length && m.focus < 60) { this.rest(m.id); return; }
     if (!pick) { m.note = this.actions.every((a) => a.done(this.s) || a.kind === 'wait') ? 'All done: file the report' : 'Standing by: nothing ready yet'; return; }
     this.claims.set(pick.id, m.id); m.claimed = pick.id; m.task = pick; m.manual = false; this.begin(m);
   }
@@ -288,6 +357,7 @@ export class TeamController {
     if (!m.path.length) this.arrive(m);
   }
   private enter(m: Member): void {
+    this.spend(m, WALK_EFFORT);
     const cx = Math.floor(m.pos.x), cy = Math.floor(m.pos.y);
     if (GRID.kind[cy]?.[cx] === 'room') { const r = roomAt(cx, cy); if (r) this.runner.onEnterRoom(r.id); }
   }
@@ -310,7 +380,7 @@ export class TeamController {
   private perform(m: Member): void {
     const a = m.task!, s = this.s, r = this.runner;
     s.log(`${m.name}: ${a.label}.`, 'info');
-    this.acting = m;
+    this.acting = m; this.spend(m, effortCost(a, m));
     try { performAction(r, a); } finally { this.acting = null; }
     if (!m.manual) s.stats.autoActions++;
     m.phase = 'settle'; m.settle = 0.5; m.note = 'Checking the result';

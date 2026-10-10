@@ -659,3 +659,176 @@ describe('incident board: wrong moves, hints and the Kanban rules', () => {
     const hub = MISSIONS.find((x) => x.order === 0)!; const s2 = new GameState(hub); const r2 = new MissionRunner(s2); r2.start(); expect(IncidentBoard.for(s2, r2).defs.length).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------- Manager mode: effort and resources are visible and matter ----
+import { effortCost, fatigueOf, EFFORT_BUDGET, REST_UNTIL } from '../src/game/systems/Team';
+describe('manager mode: effort, focus and questions', () => {
+  function crew() {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!; const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    const r = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+    const team = new TeamController(s, run, { team: true, spawn: [0, 1, 2, 3].map((i) => nearestWalkable(walk, r.x0 + 2 + i * 2, r.y0 + 4, 4)!), autoDecide: () => true });
+    return { m, s, run, team, step: (n: number) => { for (let i = 0; i < n; i++) { run.tick(0.25); team.update(0.25); } } };
+  }
+  it('every action has a visible cost: specialists are efficient, covering for someone else costs half as much again', () => {
+    const { team } = crew(); const a = team.actions.find((x) => x.id === 'scan')!;       // an investigation task
+    const priya = team.member('priya')!, marcus = team.member('marcus')!;
+    expect(effortCost(a, priya)).toBe(4); expect(effortCost(a, marcus)).toBe(6);
+    const q = team.quote(marcus, a); expect(q.cost).toBe(6); expect(q.specialist).toBe(false); expect(q.seconds).toBeGreaterThan(0); expect(q.enough).toBe(true);
+    expect(team.quote(priya, a).specialist).toBe(true);
+  });
+  it('doing work spends Focus and the team budget; idling recovers Focus', () => {
+    const { team, s, step } = crew();
+    expect(team.order('priya', { tool: 'e', target: 'prop:secure_ops.incident_wall' })).toBeNull();
+    step(120);
+    const p = team.member('priya')!;
+    expect(s.flags.briefed).toBe(true); expect(p.spent).toBeGreaterThan(2); expect(team.spent).toBeGreaterThan(2); expect(s.stats.effort).toBeGreaterThan(2);
+    const low = p.focus; step(80); expect(p.focus).toBeGreaterThanOrEqual(low);        // recovering, not draining
+    expect(EFFORT_BUDGET).toBe(100); expect(team.overtime).toBe(0);
+  });
+  it('an exhausted teammate refuses orders until they have had a break, and a break restores Focus', () => {
+    const { team, step } = crew(); const p = team.member('priya')!;
+    p.focus = 4; expect(fatigueOf(p.focus)).toBe('exhausted');
+    expect(team.order('priya', { tool: 'e', target: 'prop:secure_ops.incident_wall' })).toMatch(/exhausted.*break/i);
+    team.rest('priya'); expect(p.resting).toBe(true); expect(p.breaks).toBe(1);
+    step(60); expect(p.focus).toBeGreaterThanOrEqual(REST_UNTIL); expect(p.resting).toBe(false);
+    expect(team.order('priya', { tool: 'e', target: 'prop:secure_ops.incident_wall' })).toBeNull();
+  });
+  it('a tired teammate works more slowly', () => {
+    const a = crew(), b = crew(); const run = (c: typeof a, focus: number) => { const p = c.team.member('priya')!; p.focus = focus; c.team.order('priya', { tool: 'e', target: 'prop:secure_ops.incident_wall' }); let t = 0; while (!c.s.flags.briefed && t < 800) { c.step(1); p.focus = focus; t++; } return t; };
+    expect(run(b, 20)).toBeGreaterThan(run(a, 90));
+  });
+  it('Auto teammates take their own breaks and still finish the shift', () => {
+    const { team, s, step } = crew(); team.setAllAuto(true);
+    for (let i = 0; i < 4000 && !s.complete; i++) step(1);
+    expect(s.stats.effort).toBeGreaterThan(20);
+  });
+  it('questions get plain answers about status, recommendation, blockers and how they feel', () => {
+    const { team, step } = crew(); const all = (['status', 'recommend', 'blocked', 'feeling'] as const).map((q) => team.question('marcus', q)!);
+    for (const it of all) { expect(it.kind).toBe('report'); expect(it.member).toBe('Marcus'); expect(it.text!.length).toBeGreaterThan(10); }
+    expect(all[2].text).toMatch(/cannot start yet|Nothing/); expect(all[3].text).toMatch(/Fresh \(Focus 100%\)/);
+    team.member('marcus')!.focus = 20; expect(team.question('marcus', 'feeling')!.text).toMatch(/tired/i);
+    expect(team.question('you', 'status')).toBeNull(); step(1);
+  });
+});
+
+// ---------------------------------------------------------------- Access Review (fictional) ----
+import { PERMISSIONS, PERM, ROLES, SOD_RULES, conflictsOf } from '../src/data/access/catalog';
+import { REQUESTS as ACCESS_REQUESTS, REJECT_REASONS, type AccessRequest } from '../src/data/access/requests';
+import { SERVICE_BRIEFS as SBRIEFS, REVIEW_RECORDS as RRECORDS } from '../src/data/access/service';
+import { AccessSession, checkService, evaluate, evaluateReview, flagsFor, rationaleFor, type Decision } from '../src/game/systems/AccessReview';
+
+describe('access review: data', () => {
+  it('covers every team and role, manager and member seats, audit, service identities and all three environments', () => {
+    expect(new Set(ACCESS_REQUESTS.map((r) => r.person.role))).toEqual(new Set(Object.keys(ROLES)));
+    expect(new Set(ACCESS_REQUESTS.map((r) => r.env))).toEqual(new Set(['Training', 'Test', 'Production']));
+    expect(ACCESS_REQUESTS.some((r) => r.person.role === 'ap_manager')).toBe(true); expect(ACCESS_REQUESTS.some((r) => r.person.role === 'ap_member')).toBe(true);
+    expect(ACCESS_REQUESTS.some((r) => r.person.role === 'ar_manager')).toBe(true); expect(ACCESS_REQUESTS.some((r) => r.person.role === 'ar_member')).toBe(true);
+    for (const a of ['approve', 'amend', 'reject', 'info', 'escalate']) expect(ACCESS_REQUESTS.some((r) => r.ideal.action === a), a).toBe(true);
+  });
+  it('is internally consistent: real permission ids, conflict-free least-privilege answers, synthetic people only', () => {
+    expect(new Set(ACCESS_REQUESTS.map((r) => r.id)).size).toBe(ACCESS_REQUESTS.length);
+    for (const r of ACCESS_REQUESTS) {
+      for (const p of [...r.current, ...r.requested, ...r.tray, ...r.ideal.set]) expect(PERM[p], `${r.id}: ${p}`).toBeDefined();
+      expect(r.requested.some((p) => !r.current.includes(p)) || r.current.length === r.requested.length, r.id).toBe(true);
+      if (r.ideal.action === 'amend' || r.ideal.action === 'approve') expect(conflictsOf(r.ideal.set, { role: r.person.role, ...r.ctx, ownWork: false }), `${r.id} ideal has no conflicts`).toEqual([]);
+      expect(r.person.seed).toMatch(/^[a-z0-9]{6}$/); expect(r.person.staffId).toMatch(/^(ST|SV)-\d{4}$/);
+      expect(r.person.name).not.toMatch(/@/); expect(r.reason.length).toBeGreaterThan(5);
+    }
+    for (const p of PERMISSIONS) { expect(p.what.length, p.id).toBeGreaterThan(15); expect(p.system && p.room).toBeTruthy(); }
+  });
+  it('detects every segregation-of-duties rule', () => {
+    const t = (set: string[], role: any, extra: any = {}) => conflictsOf(set, { role, ...extra }).map((c) => c.rule.id);
+    expect(t(['jnl.prepare', 'jnl.approve'], 'accounting')).toContain('J1'); expect(t(['jnl.post', 'jnl.approve'], 'accounting')).toContain('J1');
+    expect(t(['tre.transfer.prepare', 'tre.transfer.approve'], 'treasury')).toContain('T1');
+    expect(t(['pr.batch.prepare', 'pr.batch.release'], 'payroll')).toContain('P1'); expect(t(['pr.batch.prepare', 'pr.batch.approve'], 'payroll')).toContain('P1');
+    expect(t(['sup.change', 'pay.release'], 'ap_manager')).toContain('S1'); expect(t(['sup.change', 'ap.invoice.approve'], 'ap_manager')).toContain('S1');
+    expect(t(['ar.writeoff.prepare', 'ar.writeoff.approve'], 'ar_manager')).toContain('W1'); expect(t(['ar.adjust.prepare', 'ar.adjust.approve'], 'ar_manager')).toContain('W1');
+    expect(t(['ap.invoice.enter', 'ap.invoice.approve'], 'ap_member')).toContain('AP1'); expect(t(['ap.invoice.approve'], 'ap_manager', { ownWork: true })).toContain('AP1');
+    expect(t(['iam.grant'], 'accounting', { selfApproval: true })).toContain('A1');
+    expect(t(['aud.report.read', 'jnl.approve'], 'audit')).toContain('U1'); expect(t(['aud.report.read', 'aud.evidence.read'], 'audit')).toEqual([]);
+    expect(t(['svc.events.read', 'svc.interactive'], 'service')).toContain('V1'); expect(t(['svc.events.read', 'svc.ledger.write'], 'service', { purpose: ['svc.events.read'] })).toContain('V1');
+    expect(SOD_RULES.length).toBe(9);
+  });
+  it('the policy checker flags what the request screen promises: conflicts, excess, gaps, environment, duration, vagueness', () => {
+    const f = (id: string) => flagsFor(ACCESS_REQUESTS.find((r) => r.id === id)!).map((x) => x.type);
+    expect(f('R02')).toContain('sod'); expect(f('R10')).toContain('role'); expect(f('R05')).toContain('sod'); expect(f('R06')).toContain('env'); expect(f('R14')).toContain('gap');
+    expect(f('R19')).toContain('duration'); expect(f('R21')).toContain('vague'); expect(f('R20')).toContain('self'); expect(f('R03')).toEqual([]);
+  });
+});
+
+const idealDecision = (r: AccessRequest): Decision => ({ action: r.ideal.action, set: r.ideal.set, env: r.ideal.env, rejectWhy: r.ideal.reject ?? [], info: r.ideal.info ?? [], escalateTo: r.ideal.escalateTo, reasons: rationaleFor(r).filter((x) => x.correct && !x.id.startsWith('rej:') && !x.id.startsWith('info:')).map((x) => x.id), seconds: 20 });
+
+describe('access review: decisions and scoring', () => {
+  it('the best answer to every request scores as sound, and its explanation names what was right', () => {
+    for (const r of ACCESS_REQUESTS) {
+      const res = evaluate(r, idealDecision(r));
+      expect(res.score, `${r.id} ${res.penalties.map((p) => p.text).join(' | ')}`).toBeGreaterThanOrEqual(95); expect(res.verdict, r.id).toBe('correct');
+      expect(res.right.length, r.id).toBeGreaterThan(0); expect(res.teach.length).toBeGreaterThan(20);
+    }
+  });
+  it('approving everything as submitted is punished, with the reasons visible', () => {
+    let total = 0, conflicts = 0;
+    for (const r of ACCESS_REQUESTS) { const res = evaluate(r, { action: 'approve', set: [], env: r.env, rejectWhy: [], info: [], reasons: [], seconds: 5 }); total += res.score; conflicts += res.penalties.filter((p) => /Segregation|Unnecessary/.test(p.text)).length; if (r.ideal.action !== 'approve') expect(res.verdict).not.toBe('correct'); }
+    expect(total / ACCESS_REQUESTS.length).toBeLessThan(55); expect(conflicts).toBeGreaterThan(8);
+  });
+  it('rejecting everything is no better: legitimate requests are not blocked for nothing', () => {
+    const ok = ACCESS_REQUESTS.find((r) => r.id === 'R13')!, res = evaluate(ok, { action: 'reject', set: [], env: ok.env, rejectWhy: ['noneed'], info: [], reasons: [], seconds: 5 });
+    expect(res.score).toBeLessThan(50); expect(res.risky.join(' ')).toMatch(/not the best response/); expect(res.penalties.map((p) => p.text).join(' ')).toMatch(/blocked from legitimate work|Missing necessary/);
+  });
+  it('a senior title does not excuse a conflict (R02), and the safeguard is explained', () => {
+    const r = ACCESS_REQUESTS.find((x) => x.id === 'R02')!;
+    const res = evaluate(r, { action: 'approve', set: [], env: r.env, rejectWhy: [], info: [], reasons: ['x0'], seconds: 10 });
+    expect(res.verdict).toBe('risky'); expect(res.risky.join(' ')).toMatch(/J1/); expect(res.risky.join(' ')).toMatch(/Safeguard/);
+  });
+  it('adding the justified missing permission and removing excess are both rewarded (R14, R05)', () => {
+    const r14 = ACCESS_REQUESTS.find((x) => x.id === 'R14')!;
+    const noAdd = evaluate(r14, { ...idealDecision(r14), set: ['ar.balance.view', 'ar.receipt.record'] }); expect(noAdd.penalties.map((p) => p.text).join(' ')).toMatch(/Missing necessary access: "Work collection cases"/);
+    const r05 = ACCESS_REQUESTS.find((x) => x.id === 'R05')!;
+    const keep = evaluate(r05, { ...idealDecision(r05), set: [...r05.ideal.set, 'pay.release'] }); expect(keep.penalties.map((p) => p.text).join(' ')).toMatch(/Unnecessary privilege: "Release payments to the bank"/);
+    expect(evaluate(r05, idealDecision(r05)).score).toBeGreaterThan(keep.score);
+  });
+  it('environment matters (R06: practice belongs in Training)', () => {
+    const r = ACCESS_REQUESTS.find((x) => x.id === 'R06')!; const prod = evaluate(r, { ...idealDecision(r), env: 'Production' });
+    expect(prod.penalties.map((p) => p.text).join(' ')).toMatch(/Wrong environment/); expect(evaluate(r, idealDecision(r)).env).toBe('Training');
+  });
+  it('independent approval: the right approver scores, the requester or their own manager does not (R12, R15)', () => {
+    const r = ACCESS_REQUESTS.find((x) => x.id === 'R12')!;
+    const good = evaluate(r, idealDecision(r)), self = evaluate(r, { ...idealDecision(r), escalateTo: 'self' }), line = evaluate(r, { ...idealDecision(r), escalateTo: 'line_mgr' });
+    expect(good.parts[1].points).toBe(30); expect(self.parts[1].points).toBe(0); expect(line.parts[1].points).toBe(0); expect(self.risky.join(' ')).toMatch(/not independent/);
+    const r15 = ACCESS_REQUESTS.find((x) => x.id === 'R15')!; expect(evaluate(r15, { action: 'approve', set: [], env: r15.env, rejectWhy: [], info: [], reasons: [], seconds: 5 }).verdict).not.toBe('correct');
+  });
+  it('slow decisions lose timeliness points but are not marked wrong', () => {
+    const r = ACCESS_REQUESTS.find((x) => x.id === 'R03')!; const slow = evaluate(r, { ...idealDecision(r), seconds: r.sla * 3 });
+    expect(slow.parts[3].points).toBe(4); expect(slow.score).toBeGreaterThan(80); expect(slow.risky.join(' ')).toMatch(/target was/);
+  });
+  it('the "why" list mixes justifying reasons with plausible wrong ones, deterministically', () => {
+    for (const r of ACCESS_REQUESTS) { const a = rationaleFor(r), b = rationaleFor(r); expect(a).toEqual(b); expect(a.some((x) => x.correct)).toBe(true); expect(a.filter((x) => !x.correct).length).toBeGreaterThanOrEqual(3); }
+    expect(REJECT_REASONS.length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('access review: service form, review board, audit trail', () => {
+  const good = (b: (typeof SBRIEFS)[number]) => ({ name: 'svc-' + b.id.toLowerCase(), owner: 'Data Platform lead', purpose: b.purpose, target: b.target, env: b.env, actions: b.required, scope: b.scope, days: b.maxDays - 10, approver: 'Independent manager', reviewDays: 30 });
+  it('a well-formed service form passes every check, and each mistake is caught with a fix', () => {
+    for (const b of SBRIEFS) expect(checkService(b, good(b)).score).toBe(100);
+    const b = SBRIEFS[0], bad = checkService(b, { ...good(b), name: 'Jane Doe', owner: '(not named)', actions: [...b.required, 'svc.interactive', 'svc.ledger.write'], scope: 'All ledger data', days: 400, approver: 'The service owner (same person)', reviewDays: 500 });
+    expect(bad.checks.filter((c) => !c.ok).length).toBeGreaterThanOrEqual(7); expect(bad.checks.every((c) => c.ok || c.fix.length > 10)).toBe(true); expect(bad.score).toBeLessThan(40);
+  });
+  it('review records: the right action scores fully; keeping excess or removing justified access is penalised with a reason', () => {
+    for (const r of RRECORDS) expect(evaluateReview(r, { verdict: r.ideal, addPerm: r.addPerm }).points, r.id).toBe(100);
+    const stale = RRECORDS.find((r) => r.issue === 'stale')!, ok = RRECORDS.find((r) => r.issue === 'ok')!;
+    expect(evaluateReview(stale, { verdict: 'keep' }).penalty).toMatch(/Left stale access/); expect(evaluateReview(ok, { verdict: 'remove' }).penalty).toMatch(/Removed justified access/);
+    expect(evaluateReview(stale, { verdict: 'independent' }).points).toBe(60);
+    const miss = RRECORDS.find((r) => r.issue === 'missing')!; expect(evaluateReview(miss, { verdict: 'add', addPerm: 'ar.writeoff.prepare' }).points).toBe(40);
+    expect(new Set(RRECORDS.map((r) => r.issue))).toEqual(new Set(['ok', 'stale', 'excessive', 'conflict', 'orphaned', 'missing']));
+  });
+  it('the audit trail records who asked, who approved and what was decided; unreviewed high-risk access costs points', () => {
+    const store: Record<string, string> = {}; const s = new AccessSession({ getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } });
+    const r = ACCESS_REQUESTS.find((x) => x.id === 'R12')!; s.decide(r, idealDecision(r));
+    const e = s.audit[0]; expect(e.requestedBy).toBe('Mateo Ibarra'); expect(e.approvedBy).toMatch(/Pending: .*Accounts Payable approver/); expect(e.decision).toMatch(/Awaiting/); expect(e.subject).toMatch(/Production/);
+    const sum = s.summary(); expect(sum.penalties.some((p) => /never reviewed/.test(p.text))).toBe(true); expect(sum.total).toBeLessThan(100);
+    expect(JSON.parse(store['ledgerlock.access.v1']).audit.length).toBe(1);
+    for (const q of ACCESS_REQUESTS) s.decide(q, idealDecision(q));
+    expect(s.summary().penalties.filter((p) => /never reviewed/.test(p.text))).toEqual([]); expect(s.summary().total).toBeGreaterThanOrEqual(95);
+  });
+});
