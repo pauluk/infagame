@@ -224,7 +224,7 @@ export class MissionRunner {
     if (t.kind === 'reader' && t.door) { a.dialog({ type: 'access', readerRoom: t.door.room }); return true; }
     if (t.id === 'prop:secure_ops.access_desk') { a.dialog({ type: 'access' }); return true; }
     if (t.id === 'prop:secure_ops.evidence_board') { a.dialog({ type: 'board' }); return true; }
-    if (t.id === 'prop:secure_ops.map_table') { this.s.emit('ui', 'map'); return true; }
+    if (t.id === 'prop:secure_ops.map_table') { this.s.emit('ui', 'blueprint'); return true; }
     if (t.id === 'prop:secure_ops.coffee') { a.say('Coffee Machine', 'You pour a coffee. The incident log notes: "Morale +3%." (Not a real metric.)', 'info'); return true; }
     if (t.kind === 'ext') { a.say(t.name, `${t.desc} This is a simulated external service: the game never sends real payments.`, 'info'); return true; }
     if (t.kind === 'prop' && !t.prop!.interactive) { a.say(t.name, t.prop!.desc, 'info'); return true; }

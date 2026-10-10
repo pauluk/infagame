@@ -478,3 +478,36 @@ describe('teammates and JEV (confidence-gated routing)', () => {
     expect(s.flags.diagnosed).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------- facility graph (single source of truth) ----
+import { EQUIPMENT, EQUIPMENT_SPEC, GRAPH_ROOMS, CORRIDORS, DIAGRAMS, PORTS, layoutDiagram, incidentLink, placementOf } from '../src/data/facilityGraph';
+describe('facility graph', () => {
+  it('lists the 12 rooms at their grid positions with the specified IDs, names and codes', () => {
+    const want: Record<string, [string, string, number, number]> = { api_gateway: ['A1', 'API Gateway', 0, 0], event_stream: ['B1', 'Event Stream Hall', 1, 0], fabric_platform: ['C1', 'Fabric Data Platform', 2, 0], integration_exchange: ['D1', 'Integration Exchange', 3, 0], service_payments: ['A2', 'Service Payments', 0, 1], finance_core: ['B2', 'Finance Core', 1, 1], payment_orchestration: ['C2', 'Payment Orchestration', 2, 1], bacs_vault: ['D2', 'BACS Vault', 3, 1], secure_ops: ['A3', 'Secure Ops Control', 0, 2], card_payments: ['B3', 'Card Payments', 1, 2], debt_recovery: ['C3', 'Accounts Receivable & Debt Recovery', 2, 2], agency_handoff: ['D3', 'Agency Hand-off', 3, 2] };
+    expect(GRAPH_ROOMS.length).toBe(12);
+    for (const r of GRAPH_ROOMS) { const w = want[r.id]; expect(w, r.id).toBeDefined(); expect([r.code, r.col, r.row]).toEqual([w[0], w[2], w[3]]); expect(r.name.replace('Accounts Receivable and Debt Recovery', 'Accounts Receivable & Debt Recovery')).toBe(w[1]); }
+  });
+  it('places every listed piece of equipment in its room at the requested spot', () => {
+    expect(EQUIPMENT.length).toBe(EQUIPMENT_SPEC.length);
+    for (const e of EQUIPMENT) expect(e.ok, `${e.room}: ${e.label} wants ${e.wanted.join('+')}, is at ${e.placement.join('+')} (${e.local.x},${e.local.y})`).toBe(true);
+    expect(placementOf(5, 4)).toEqual(['centre']);
+  });
+  it('has 17 corridors between rooms, all outside the room footprints', () => {
+    expect(CORRIDORS.length).toBe(17);
+    for (const c of CORRIDORS) for (const r of GRAPH_ROOMS) { const hit = c.x < r.x0 + r.w && c.x + c.w > r.x0 && c.y < r.y0 + r.h && c.y + c.h > r.y0; expect(hit, `${c.from}-${c.to} overlaps ${r.id}`).toBe(false); }
+  });
+  it('builds each diagram from route data: finance flow follows the specified chain, and returning routes run back', () => {
+    const fin = layoutDiagram(DIAGRAMS[0]);
+    const col = (id: string) => fin.nodes.find((n) => n.id === id)!.col;
+    expect(['service_payments', 'api_gateway', 'finance_core', 'payment_orchestration', 'bacs_vault', 'bank_sim'].map(col)).toEqual([0, 1, 2, 3, 4, 5]);
+    const ev = layoutDiagram(DIAGRAMS[2]);
+    expect(ev.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['finance_core', 'event_stream', 'fabric_platform', 'prop:fabric_platform.bronze', 'prop:fabric_platform.silver', 'prop:fabric_platform.gold', 'reporting_display']));
+    const cd = layoutDiagram(DIAGRAMS[1]); const c2 = (id: string) => cd.nodes.find((n) => n.id === id)!.col;
+    expect(c2('card_network_sim')).toBeLessThan(c2('card_payments')); expect(c2('integration_exchange')).toBeLessThan(c2('agency_sim'));
+  });
+  it('derives ports from the routes and links incidents to rooms, routes and evidence locations', () => {
+    expect(PORTS.some((p) => p.room === 'card_payments' && p.routeIds.includes('receipt_event_feed'))).toBe(true);
+    for (const m of MISSIONS) { const l = incidentLink(m); expect(l.sourceRoom).toBe(m.alert.points); for (const e of l.evidence) if (e.at) expect(e.at.startsWith('prop:')).toBe(true); }
+    const dg = incidentLink(MISSIONS.find((x) => x.id === 'duplicate-ghost')!); expect(dg.evidence.every((e) => e.at)).toBe(true);
+  });
+});

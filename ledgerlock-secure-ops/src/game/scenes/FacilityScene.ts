@@ -4,6 +4,7 @@ import { ATLAS_GROUPS, hasFrame, makeImage } from '../art';
 import { depthOf, findPath, guideToRoom, nearestReachable, nearestWalkable, toGrid, toScreen, walkableFor } from '../systems/Grid';
 import { reachRange } from '../systems/Reach';
 import { jev } from '../../integrations/jev/JevClient';
+import { standFor } from '../systems/Reach';
 import { TeamController, type ExternalBody, type Member } from '../systems/Team';
 import { FlowRenderer } from '../systems/FlowRenderer';
 import { GameState } from '../systems/GameState';
@@ -67,6 +68,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private coach!: Phaser.GameObjects.Graphics;
   private coachTargets: string[] = [];
   team!: TeamController;
+  private waypoint: { cell: Cell; label: string } | null = null;
+  private flash: { ids: string[]; until: number } = { ids: [], until: 0 };
   private crewSprites = new Map<string, { img: Phaser.GameObjects.Image; tag: Phaser.GameObjects.Text; ring: Phaser.GameObjects.Graphics }>();
   private wallBoard!: Phaser.GameObjects.Text;
   private wallSig = '';
@@ -290,6 +293,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     kb.on('keydown-L', () => app.ui?.openPanel('log'));
     kb.on('keydown-R', () => this.setRoutesVisible(!this.flow.visible));
     kb.on('keydown-C', () => this.returnToPlayer());
+    kb.on('keydown-B', () => (document.getElementById('b-blueprint') as HTMLElement | null)?.click());
     kb.on('keydown-T', () => (document.getElementById('b-team') as HTMLElement | null)?.click());
     kb.on('keydown-G', () => { if (!this.state.paused) app.ui?.openGoals(); });
     kb.on('keydown-PLUS', () => this.zoomBy(0.15));
@@ -338,6 +342,26 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     return g;
   }
   setCoachTargets(ids: string[]): void { this.coachTargets = ids; }
+  /** Pulse a beacon on these targets for a few seconds (used by the map and blueprint to show "this one"). */
+  flashTargets(ids: string[], ms = 6000): void { this.flash = { ids, until: this.time.now + ms }; }
+  /** Walk (never teleport) to the nearest place from which `target` can be used. Locked rooms: walk to the corridor outside the door. */
+  setWaypoint(target: string): { ok: boolean; note: string } {
+    const t = describeTarget(target); if (!t) return { ok: false, note: 'That place is not on the map.' };
+    const from = this.to ?? this.from, passes = this.state.passes;
+    let cell: Cell | null = null, locked = false;
+    const st = standFor(target, from, passes);
+    if (st) cell = st.goal;
+    else {
+      const room = t.room?.id ?? t.prop?.room ?? (t.route ? routeRooms(t.route)[0] : t.door?.room);
+      const g = room ? guideToRoom(from, room, passes) : null;
+      if (g?.path.length) { cell = g.path[g.path.length - 1]; locked = g.locked; this.guideCells = g.path; this.guideUntil = this.time.now + 14000; }
+    }
+    if (!cell) return { ok: false, note: `There is no walkable way to ${t.name} from here.` };
+    this.takeOver();
+    this.waypoint = { cell, label: t.name }; this.walkTo(cell); this.returnToPlayer();
+    return { ok: true, note: locked ? `${t.name} is locked for you. Walking to the corridor outside its door: the door reader shows which pass opens it.` : `Walking to ${t.name}.` };
+  }
+  clearWaypoint(): void { this.waypoint = null; this.path = []; }
   setRoutesVisible(v: boolean): void { this.flow.setVisible(v); }
   routesVisible(): boolean { return this.flow.visible; }
   focusOn(target: string): void {
@@ -666,9 +690,17 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   /** Tutorial-mode beacon: a bouncing arrow and a pulsing ring on the coached target(s). */
   private drawCoach(time: number): void {
     const g = this.coach; g.clear();
-    if (!this.state.tutorial || !this.coachTargets.length) return;
     const reduced = settings.data.reducedMotion;
-    for (const id of this.coachTargets) {
+    if (this.waypoint) {
+      const w = this.waypoint, s = this.S(w.cell.x + 0.5, w.cell.y + 0.5), k = reduced ? 1 : 1 + 0.15 * Math.sin(time / 200);
+      g.lineStyle(3, C.cyan, 0.95).beginPath().moveTo(s.x, s.y - 12 * k).lineTo(s.x + 24 * k, s.y).lineTo(s.x, s.y + 12 * k).lineTo(s.x - 24 * k, s.y).closePath().strokePath();
+      g.lineStyle(2, C.cyan, 0.8).lineBetween(s.x, s.y, s.x, s.y - 60).strokeCircle(s.x, s.y - 64, 5);
+      const pc = { x: Math.floor(this.pos.x), y: Math.floor(this.pos.y) };
+      if (!this.to && !this.path.length) { const near = Math.abs(pc.x - w.cell.x) <= 1 && Math.abs(pc.y - w.cell.y) <= 1; this.waypoint = null; if (near) app.ui?.toast(`Arrived: ${w.label}.`, 'good'); }
+    }
+    const ids = [...(this.state.tutorial ? this.coachTargets : []), ...(this.time.now < this.flash.until ? this.flash.ids : [])];
+    if (!ids.length) return;
+    for (const id of ids) {
       const pos = this.targetPos(id); if (!pos) continue;
       const t = describeTarget(id);
       const bob = reduced ? 0 : Math.sin(time / 180) * 5, ring = reduced ? 1 : 1 + 0.12 * Math.sin(time / 220);

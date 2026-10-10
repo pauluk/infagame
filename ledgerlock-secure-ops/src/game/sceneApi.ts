@@ -18,4 +18,7 @@ export interface SceneApi {
   /** Manager mode and Auto-play. */
   team: TeamController;
   focusMember(id: string): void;
+  flashTargets(ids: string[], ms?: number): void;
+  setWaypoint(target: string): { ok: boolean; note: string };
+  clearWaypoint(): void;
 }
