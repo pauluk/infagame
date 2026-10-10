@@ -168,7 +168,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       }
       for (const d of r.doors) this.addDoor(d);
     }
-    // facility entrance on the south side of Secure Ops Control (outside the south corridor)
+    // facility entrance gate: decorative, on open ground outside the atrium's south-east corner
     const e = this.S(ENTRANCE.x + 1.5, ENTRANCE.y + 0.5);
     makeImage(this, 'environment', 'entrance_gate', e.x, e.y).setDepth(depthOf(ENTRANCE.x + 1.5, ENTRANCE.y + 0.5, 1));
     this.add.text(e.x, e.y - 74, 'FACILITY ENTRANCE', { fontFamily: 'system-ui, sans-serif', fontSize: '10px', color: PALETTE.navy, backgroundColor: PALETTE.cyan, padding: { x: 4, y: 1 } }).setOrigin(0.5).setDepth(15000).setResolution(2);

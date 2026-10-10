@@ -16,7 +16,7 @@ Every mission has **primary** objectives (required), **optional** objectives (re
 | Recovery readiness | Safe restore, rollback and recovery verification | verified restores and clean-ups (up), restoring unrelated systems (down) |
 | Audit quality | Clear evidence, recorded actions and a verified outcome | evidence retrieved, results recorded, verification (up), unjustified pass requests and rubber-stamped approvals (down) |
 
-The overall figure is `0.6 x mean + 0.4 x weakest measure`, so a high score needs balance: shutting everything down protects integrity but costs availability, and releasing everything unchecked keeps services up but costs integrity (both are covered by tests). It is shown on the **Control Room wall** (a panel above the Incident Wall in Secure Ops Control), in the *Confidence* dialog, in the incident alert, on the mission select screen and in every debrief (campaign before -> after, plus that mission's own result). Campaign measures move 60% towards each completed mission's result.
+The overall figure is `0.6 x mean + 0.4 x weakest measure`, so a high score needs balance: shutting everything down protects integrity but costs availability, and releasing everything unchecked keeps services up but costs integrity (both are covered by tests). It is shown on the **Control Room wall** (a panel above the Incident Wall in Secure Operations Atrium), in the *Confidence* dialog, in the incident alert, on the mission select screen and in every debrief (campaign before -> after, plus that mission's own result). Campaign measures move 60% towards each completed mission's result.
 
 ## Missions
 

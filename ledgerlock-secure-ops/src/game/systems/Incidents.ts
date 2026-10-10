@@ -60,7 +60,7 @@ export class IncidentBoard {
     const undoneFix = [...d.actions, ...(d.fixActions ?? [])].map((id) => this.actions.get(id)).filter((a): a is PlayAction => !!a && !a.done(s));
     const missingGoal = d.requiredObjectives.find((g) => !m.goals.find((x) => x.id === g)?.done(s));
     return {
-      triaged: { ok: !!s.flags.briefed, need: 'Read the Incident Wall in Secure Ops Control to brief the shift' },
+      triaged: { ok: !!s.flags.briefed, need: 'Read the Incident Wall in Secure Operations Atrium to brief the shift' },
       investigating: { ok: collected, need: `Collect evidence: ${evNames.join(' or ')}` },
       contained: { ok: contained, need: `Contain ${d.containTarget ? describeTarget(d.containTarget)?.name ?? 'the affected route' : 'the incident'} (narrowly)` },
       fixed: { ok: undoneFix.length === 0, need: `Apply the fix: ${undoneFix[0]?.label ?? 'done'}` },

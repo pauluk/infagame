@@ -45,7 +45,7 @@ export default makeScenario({
     goal('backup_test', 'optional', 'Test that a clean backup is available', st('backup_test'), 'Clean Restore Beacon (6) at the General Ledger for a dry run.'),
     goal('alert_routing', 'optional', 'Check that an alert is routed to the correct operations room', st('alert_routing'), 'Press E at the Incident Wall.'),
     goal('event_metadata', 'optional', 'Verify that an event has a source, timestamp and owner', st('event_metadata'), 'Event Stream Hall: Replay Diagnostic Console.'),
-    goal('close_log', 'optional', 'Close a stale incident log entry after confirming its resolution', st('close_log'), 'Press E at the Incident Log Terminal in Secure Ops Control.'),
+    goal('close_log', 'optional', 'Close a stale incident log entry after confirming its resolution', st('close_log'), 'Press E at the Incident Log Terminal in Secure Operations Atrium.'),
     goal('all', 'stretch', 'Complete all six side tasks', (s) => ['revoke_pass', 'inventory', 'backup_test', 'alert_routing', 'event_metadata', 'close_log'].every((k) => !!s.flags['st_' + k])),
   ],
   setup: (a) => {

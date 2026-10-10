@@ -52,7 +52,7 @@ export default makeScenario({
   contain: [{ id: 'contain', target: SHARED, scope: 'narrow', releaseId: 'reconnect', canRelease: (s) => (s.flags.st_change ? true : 'The shared configuration is not corrected yet. Releasing now would restart the retry storm.'),
     cfg: { availability: 3, narrow: 1, effective: true, notes: [{ label: 'Holds', text: 'Only the shared Service Payment Intake route, not the facility.', tone: 'good' }, { label: 'Delays', text: 'New service payment requests queue (not lost).', tone: 'warn' }] } }],
   goals: [
-    goal('p1', 'primary', 'Review the Evidence Board and identify the common cause', st('review_board'), 'Press E at the Evidence Board in Secure Ops Control.'),
+    goal('p1', 'primary', 'Review the Evidence Board and identify the common cause', st('review_board'), 'Press E at the Evidence Board in Secure Operations Atrium.'),
     goal('p2', 'primary', 'Inspect the linked API, event and finance modules', (s) => !!s.flags.st_inspect_api && !!s.flags.st_inspect_event && !!s.flags.st_inspect_fin, 'Request each pass as the evidence points, then press E at the gateway console, replay console and general ledger.'),
     goal('p3', 'primary', 'Contain the affected shared route without shutting down the facility', st('contain'), 'Quarantine Field (3) on the Service Payment Intake route only.'),
     goal('p4', 'primary', 'Correct the simulated configuration through an approved change', st('change'), 'Patch Kit (4) at the API Gateway Console.'),

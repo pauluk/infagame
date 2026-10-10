@@ -25,9 +25,9 @@ Requires Node 20+ (developed on Node 22). `npm run assets:render` additionally n
 
 ## How to play
 
-1. **Start Shift** (title) -> read the briefing. You begin in **Secure Ops Control (A3)** holding only an `ops_pass`.
+1. **Start Shift** (title) -> read the briefing. You begin in **Secure Operations Atrium (A3)** holding only an `ops_pass`.
 2. Doors are locked until you hold the room's **read-only, mission-scoped pass**. Request passes at the **Access Desk** or at any **door reader** (press <kbd>E</kbd> next to it). Requests are approved only when evidence justifies them; otherwise you get a clear denial and a hint. There is no bypass.
-3. Walk the corridors, scan, retrieve masked evidence, trace the event order, **contain only what you must**, patch, restore, reconcile, then verify (including in the Fabric room) and file the report on the **Evidence Board** back in Secure Ops Control.
+3. Walk the corridors, scan, retrieve masked evidence, trace the event order, **contain only what you must**, patch, restore, reconcile, then verify (including in the Fabric room) and file the report on the **Evidence Board** back in Secure Operations Atrium.
 4. The debrief scores you out of 100 (35 integrity, 25 availability, 20 diagnosis and verification, 10 privacy and containment, 10 time) and shows the campaign Service Confidence before and after. A safe, verified result is always a positive result, and a broad shutdown is recoverable.
 
 ### Controls
@@ -78,7 +78,7 @@ Turn on **JEV** in Settings (it needs `TYPESAFE_API_KEY` on the server) to ask T
 |---|---|---|---|---|
 | North | A1 API Gateway | B1 Event Stream Hall | C1 Fabric Data Platform | D1 Integration Exchange |
 | Middle | A2 Service Payments | B2 Finance Core | C2 Payment Orchestration | D2 BACS Vault |
-| South | A3 Secure Ops Control | B3 Card Payments | C3 Accounts Receivable & Debt Recovery | D3 Agency Hand-off |
+| South | A3 Secure Operations Atrium | B3 Card Payments | C3 Accounts Receivable & Debt Recovery | D3 Agency Hand-off |
 
 Finance routes (cyan/blue/mint/violet/periwinkle pulses with direction arrows, labels and live states `healthy, delayed, suspicious, quarantined, rerouted, restored`) are a **separate overlay**: they never block movement. Simulated bank, card network, fictional agency and reporting display sit just outside the facility, labelled *simulated external service*.
 

@@ -17,7 +17,7 @@ const list: IncidentDef[] = [
         { id: 'c', label: 'Duplicate posting risk', detail: 'Finance Core', shape: 'hex', why: 'The finance posting module retries without an idempotency key under the same template.' },
         { id: 'd', label: 'Card terminal firmware version', detail: 'Card Payments', shape: 'square', why: 'Firmware would not explain API, event and finance symptoms together.' },
         { id: 'e', label: 'Fabric dashboard looks stale', detail: 'Fabric', shape: 'triangle', why: 'Fabric is downstream: it only shows the symptoms of the upstream retries.' },
-        { id: 'x', label: 'Coffee machine limescale warning', detail: 'Secure Ops Control', shape: 'pill', why: 'Annoying, but nothing to do with the finance routes.' }] },
+        { id: 'x', label: 'Coffee machine limescale warning', detail: 'Secure Operations Atrium', shape: 'pill', why: 'Annoying, but nothing to do with the finance routes.' }] },
     correctMatches: { a: 'ch204', b: 'ch204', c: 'ch204', d: 'other', e: 'other' },
     hintText: ['Which symptoms come from the same kind of fault: retries and short timeouts?', 'Ask whether a symptom is a cause or a downstream effect.', 'API, event and finance retries are CH-204. Firmware and the dashboard are not.'],
     clueOrder: ['c_cause'],

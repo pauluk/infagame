@@ -299,9 +299,9 @@ const mission: MissionDef = {
   },
 
   objectives: [
-    { id: 'o_brief', text: 'Read the Incident Wall in Secure Ops Control', hint: 'Walk to the Incident Wall (back wall, left) and press E.', done: (s) => !!s.flags.briefed },
+    { id: 'o_brief', text: 'Read the Incident Wall in Secure Operations Atrium', hint: 'Walk to the Incident Wall (back wall, left) and press E.', done: (s) => !!s.flags.briefed },
     { id: 'o_pass1', text: 'Request the Payments Audit Pass', hint: 'Press E at the Access Desk (front-left of the room) and request the Payments Audit Pass.', done: (s) => s.passes.has('payments_audit_pass') },
-    { id: 'o_card', text: 'Walk to Card Payments (B3) through the corridors', hint: 'Leave by the east door, follow the corridor and enter Card Payments. Use the minimap (M) to see the route.', done: (s) => !!s.flags.visited_card_payments },
+    { id: 'o_card', text: 'Walk to Card Payments (B3) through the corridors', hint: 'Leave the atrium by the south door, follow the South Concourse and enter Card Payments (the door on its north wall). Use the minimap (M) to see the route.', done: (s) => !!s.flags.visited_card_payments },
     { id: 'o_scan', text: 'Scan the Card Terminal with the Signal Scanner (1)', hint: 'Select tool 1 and press E at the Card Terminal (simulated).', done: (s) => !!s.flags.scannedTerminal },
     { id: 'o_receipt', text: 'Retrieve the masked receipt', hint: 'Press E at the Masked Receipt Log.', done: (s) => !!s.flags.receiptEvidence },
     { id: 'o_lens', text: 'Trace the replay fault with the Forensic Lens (2)', hint: 'Select tool 2, then click the Receipt Event Feed flow line (or press E at the Settlement Notifier).', done: (s) => !!s.flags.lensed },
@@ -316,7 +316,7 @@ const mission: MissionDef = {
     { id: 'o_recon', text: 'Reconcile totals in Finance Core (7)', hint: 'Select tool 7 and press E at the Accounts Receivable or General Ledger console.', done: (s) => !!s.flags.reconciled },
     { id: 'o_release', text: 'Release containment and verify the feed (3, then 1)', hint: 'Tool 3 on the same route releases it; then scan the route with tool 1.', done: (s) => !!s.flags.flowVerified },
     { id: 'o_fabric', text: 'Get the Fabric Observer Pass and verify freshness in Fabric Data Platform', hint: 'Request the pass, walk to C1 and press E at the Pipeline Status Display.', done: (s) => !!s.flags.fabricVerified },
-    { id: 'o_report', text: 'Return to Secure Ops Control and file the report at the Evidence Board', hint: 'Go back to A3 and press E at the Evidence Board.', done: (s) => !!s.flags.reported },
+    { id: 'o_report', text: 'Return to Secure Operations Atrium and file the report at the Evidence Board', hint: 'Go back to A3 and press E at the Evidence Board.', done: (s) => !!s.flags.reported },
   ],
 
   canReport: (s) => {
