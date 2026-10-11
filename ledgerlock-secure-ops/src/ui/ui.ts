@@ -430,16 +430,18 @@ export class UI {
       this.meter('ic', '⚠', 'Active incidents', String(st.incidents), st.incidents ? 40 : 100, st.incidents > 1 ? 'bad' : st.incidents ? 'warn' : 'ok', st.incidents ? '(unresolved)' : '(clear)');
     const objs = this.runner!.objectives(); const cur = objs.find((o) => !o.done); const done = objs.filter((o) => o.done).length;
     const showHint = this.hintOpen;
-    $(hud, '#objective')!.innerHTML = cur
+    const objHtml = cur
       ? `<div><div class="n">Objective ${done + 1} of ${objs.length}</div><div class="t">${esc(cur.text)}</div>${showHint ? `<div class="h">→ ${esc(cur.hint)}</div>` : ''}</div><button id="b-hint">${showHint ? 'Hide hint' : 'Hint'}</button>`
       : `<div><div class="n">All guided steps done</div><div class="t">Great work. File the report at the Evidence Board.</div></div>`;
-    $(hud, '#b-hint')?.addEventListener('click', () => { this.hintOpen = !this.hintOpen; this.renderHud(); });
+    if (this.put($(hud, '#objective')!, objHtml)) $(hud, '#b-hint')?.addEventListener('click', () => { this.hintOpen = !this.hintOpen; this.renderHud(); });
     const cb = $(hud, '#b-conf'); if (cb) cb.textContent = `\u2630 Confidence ${overallConfidence(measuresOf(st))}%`;
     const pm = $(hud, '#b-routes'); if (pm) pm.setAttribute('aria-pressed', String(this.scene?.routesVisible() ?? true));
     this.renderPasses();
     this.renderCoach();
   }
   private hintOpen = true;
+  /** Sets an element's HTML only when it changed, so a button under the mouse is not replaced between press and release (that swallowed clicks). */
+  private put(el: HTMLElement, html: string): boolean { if (el.dataset.sig === html) return false; el.dataset.sig = html; el.innerHTML = html; return true; }
 
   /** Tutorial mode: coach card (what to do, why it matters, which tool) and a beacon on the target. */
   private renderCoach(): void {
@@ -460,12 +462,12 @@ export class UI {
     this.scene?.setCoachTargets(targets);
     $$(hud, '.tool').forEach((b) => b.classList.toggle('coach', !!tool && b.dataset.t === tool.id));
     const need = tool && st.selectedTool !== tool.id;
-    box.innerHTML = cur ? `<div class="n">Tutorial \u00B7 step ${idx + 1} of ${objs.length}</div><div class="t">${esc(cur.text)}</div>
+    this.put(box, cur ? `<div class="n">Tutorial \u00B7 step ${idx + 1} of ${objs.length}</div><div class="t">${esc(cur.text)}</div>
       <div class="c"><b>Do this:</b> ${esc(cur.hint)}</div>
       <div class="c"><b>Why:</b> ${esc(entry?.why ?? 'Follow the hint, then check the Goals list (G) to see how this fits the mission.')}</div>
       ${tool ? `<div class="c"><b>Tool:</b> <kbd>${tool.key}</kbd> ${esc(tool.name)} ${need ? '<span class="chip warn">press ' + tool.key + ' to select it</span>' : '<span class="chip good">\u2713 selected: press E near the target</span>'}</div>` : ''}
       <div class="row">${targets.length ? '<button data-c="show">Show me</button>' : ''}<button data-c="off">Turn tutorial mode off</button></div>`
-      : `<div class="n">Tutorial complete</div><div class="t">All steps done. File the report at the Evidence Board.</div>`;
+      : `<div class="n">Tutorial complete</div><div class="t">All steps done. File the report at the Evidence Board.</div>`);
     $$(box, 'button').forEach((b) => (b.onclick = () => {
       sfx.click();
       if (b.dataset.c === 'off') settings.set('tutorial', false);
@@ -481,7 +483,7 @@ export class UI {
 
   private renderBelt(): void {
     const belt = this.hud && $(this.hud, '#belt'); if (!belt || !this.state) return;
-    belt.innerHTML = TOOLS.map((t) => `<button class="tool" data-t="${t.id}" aria-pressed="${this.state!.selectedTool === t.id}" aria-label="${t.key}: ${esc(t.name)}. ${esc(t.blurb)}"><span class="k">${t.key}</span>${this.icons[t.sprite] ? `<img alt="" src="${this.icons[t.sprite]}">` : `<span class="glyph">${t.icon}</span>`}<span class="nm">${esc(t.short)}</span></button>`).join('');
+    this.put(belt, TOOLS.map((t) => `<button class="tool" data-t="${t.id}" aria-pressed="${this.state!.selectedTool === t.id}" aria-label="${t.key}: ${esc(t.name)}. ${esc(t.blurb)}"><span class="k">${t.key}</span>${this.icons[t.sprite] ? `<img alt="" src="${this.icons[t.sprite]}">` : `<span class="glyph">${t.icon}</span>`}<span class="nm">${esc(t.short)}</span></button>`).join(''));
     $$(belt, '.tool').forEach((b) => (b.onclick = () => this.selectTool(b.dataset.t as ToolId)));
     this.renderTooltip();
     this.coachSig = ''; this.renderCoach();
@@ -534,7 +536,7 @@ export class UI {
     }
     const r = st.latestResult;
     if (r) html += `<div class="res ${r.tone}"><b>${toneIcon(r.tone)} ${esc(r.title)}</b>${esc(r.text)}</div>`;
-    box.innerHTML = html;
+    this.put(box, html);
     box.dataset.empty = t ? '0' : '1';
     $$(box, 'button[data-act]').forEach((b) => (b.onclick = () => {
       const a = b.dataset.act; sfx.click();
@@ -626,13 +628,13 @@ export class UI {
 
   private renderPasses(): void {
     const st = this.state, box = this.hud && $(this.hud, '#passes'); if (!st || !box) return;
-    box.innerHTML = '<span class="chip" style="font-size:.7em">Passes:</span>' + Object.values(PASSES).filter((p) => st.passes.has(p.id) || (p.id !== 'maintenance_pass' && p.id !== 'courier_pass')).map((p) => `<span class="chip ${st.passes.has(p.id) ? 'good' : ''}" title="${esc(p.scope)}">${st.passes.has(p.id) ? '✓' : '🔒'} ${esc(p.name.replace(' Pass', ''))}</span>`).join('');
+    this.put(box, '<span class="chip" style="font-size:.7em">Passes:</span>' + Object.values(PASSES).filter((p) => st.passes.has(p.id) || (p.id !== 'maintenance_pass' && p.id !== 'courier_pass')).map((p) => `<span class="chip ${st.passes.has(p.id) ? 'good' : ''}" title="${esc(p.scope)}">${st.passes.has(p.id) ? '✓' : '🔒'} ${esc(p.name.replace(' Pass', ''))}</span>`).join(''));
   }
 
   // ===================================================================== log ====
   private renderLog(): void {
     const st = this.state, box = this.hud && $(this.hud, '#logpanel'); if (!st || !box) return;
-    box.innerHTML = `<h3>Incident log</h3><ul>${st.logEntries.slice(-40).reverse().map((e) => `<li class="${e.tone}"><time>${e.t}</time>${toneIcon(e.tone)} ${esc(e.text)}</li>`).join('')}</ul>`;
+    this.put(box, `<h3>Incident log</h3><ul>${st.logEntries.slice(-40).reverse().map((e) => `<li class="${e.tone}"><time>${e.t}</time>${toneIcon(e.tone)} ${esc(e.text)}</li>`).join('')}</ul>`);
   }
 
   // ===================================================================== panels ====

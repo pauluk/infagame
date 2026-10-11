@@ -41,7 +41,8 @@ export class TeamPanel {
     const crewOn = t.crewOn;
     const pending = t.inbox.filter((i) => i.kind === 'decision' && !i.resolved).length;
     this.btn.classList.toggle('on', t.anyAuto() || crewOn);
-    this.btn.innerHTML = `${crewOn ? '\u{1F465} Team' : '⏵ Auto'}${pending ? ` <span class="badge">${pending}</span>` : ''}`;
+    const lbl = `${crewOn ? '\u{1F465} Team' : '⏵ Auto'}${pending ? ` <span class="badge">${pending}</span>` : ''}`;
+    if (this.btn.dataset.sig !== lbl) { this.btn.dataset.sig = lbl; this.btn.innerHTML = lbl; }
     this.box.classList.toggle('hidden', !this.open || s.complete);
     document.body.classList.toggle('team-open', this.open && !s.complete);
     if (!this.open) return;
