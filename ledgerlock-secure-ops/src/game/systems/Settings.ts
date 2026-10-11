@@ -1,11 +1,11 @@
 import { Emitter } from './Emitter';
 
-export interface SettingsData { muted: boolean; reducedMotion: boolean; relaxed: boolean; touch: 'auto' | 'on' | 'off'; largeText: boolean; tutorial: boolean; team: boolean; autoDecide: boolean; jev: boolean; guided: boolean }
+export interface SettingsData { muted: boolean; reducedMotion: boolean; relaxed: boolean; touch: 'auto' | 'on' | 'off'; largeText: boolean; tutorial: boolean; team: boolean; autoDecide: boolean; jev: boolean; guided: boolean; /** Auto stays on from one mission to the next and advances the briefing and debrief screens itself. */ autoRun: boolean }
 const KEY = 'ledgerlock.settings.v1';
 
 function load(): SettingsData {
   const prefersReduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const base: SettingsData = { muted: false, reducedMotion: prefersReduced, relaxed: false, touch: 'auto', largeText: false, tutorial: false, team: false, autoDecide: false, jev: false, guided: false };
+  const base: SettingsData = { muted: false, reducedMotion: prefersReduced, relaxed: false, touch: 'auto', largeText: false, tutorial: false, team: false, autoDecide: true, jev: false, guided: false, autoRun: false };
   try { const raw = localStorage.getItem(KEY); if (raw) return { ...base, ...JSON.parse(raw) }; } catch { /* storage unavailable */ }
   return base;
 }

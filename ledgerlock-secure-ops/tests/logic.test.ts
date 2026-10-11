@@ -214,9 +214,9 @@ describe('Duplicate Ghost mission logic', () => {
 });
 
 describe('campaign missions', () => {
-  it('has the tutorial, seven further campaign missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {
@@ -1006,5 +1006,75 @@ describe('fog of discovery: visited rooms are revealed, the rest are silhouettes
     const hidden = ROOMS.find((r) => !isKnown(s, r.id))!; expect(hidden).toBeDefined();
     expect(knownRooms(s).length).toBeLessThan(ROOMS.length);
     s.setFlag('visited_' + hidden.id); expect(isKnown(s, hidden.id)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- Auto keeps going; business-continuity missions ----
+import { settings } from '../src/game/systems/Settings';
+import { BCP_FIRST } from '../src/game/systems/Campaign';
+
+describe('Auto keeps going', () => {
+  it('Auto makes the calls by default, and Auto-run is opt-in', () => {
+    expect(settings.data.autoDecide).toBe(true); expect(settings.data.autoRun).toBe(false);
+  });
+  it('the watchdog gets a stalled Auto team moving again', () => {
+    const m = MISSIONS.find((x) => x.id === 'bacs-after-dark')!;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start(); s.flags.briefed = true;
+    const room = ROOM_BY_ID[m.startRoom], walk = walkableFor(s.passes);
+    const team = new TeamController(s, run, { team: true, spawn: [0, 1, 2, 3].map((i) => nearestWalkable(walk, room.x0 + 2 + i * 2, room.y0 + 4, 4)!), autoDecide: () => true });
+    team.setAllAuto(true);
+    for (let i = 0; i < 40; i++) { run.tick(0.25); team.update(0.25); }
+    // simulate a stall: every action cooling down for ages and everyone "blocked"
+    for (const mem of team.members) { for (const a of playbookFor(m)) mem.coolUntil[a.id] = s.elapsed + 1e6; mem.fails = { x: 9 }; }
+    const before = s.stats.autoActions;
+    for (let i = 0; i < 4 * 400 && !s.complete; i++) { run.tick(0.25); team.update(0.25); }
+    expect(team.nudges).toBeGreaterThan(0);
+    expect(s.stats.autoActions).toBeGreaterThan(before);
+  });
+  it('the Auto flag is reported so the UI can remember it', () => {
+    const m = MISSIONS[1]; const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    const seen: boolean[] = []; const team = new TeamController(s, run, { team: true, spawn: [{ x: 36, y: 30 }], autoDecide: () => true, onAuto: (a) => seen.push(a) });
+    team.setAuto('you', true); team.setAuto('you', false);
+    expect(seen).toEqual([true, false]);
+  });
+});
+
+describe('business-continuity missions', () => {
+  const bcp = MISSIONS.filter((m) => m.order >= BCP_FIRST);
+  it('adds payments failure, a flood in a room and a request flood, each with a continuity decision and goals', () => {
+    expect(bcp.map((m) => m.id)).toEqual(['payments-down', 'rising-water', 'flood-gates']);
+    for (const m of bcp) {
+      const sp = (m as ScenarioMission).spec;
+      expect(sp.steps.some((x) => x.choice && x.choice.options.some((o) => !o.correct)), m.id).toBe(true);
+      expect(m.goals.filter((g) => g.kind === 'primary').length, m.id).toBeGreaterThanOrEqual(7);
+      expect(m.evidence.length, m.id).toBeGreaterThanOrEqual(3);
+    }
+  });
+  it('the track opens after the tutorial, then in order', () => {
+    const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
+    const [a, b] = bcp; expect(c.isUnlocked(a, MISSIONS)).toBe(false);
+    const tut = MISSIONS.find((m) => m.id === 'duplicate-ghost')!; const st0 = new GameState(tut); c.recordResult(Object.assign(st0, { complete: true }));
+    expect(c.isUnlocked(a, MISSIONS)).toBe(true); expect(c.isUnlocked(b, MISSIONS)).toBe(false);
+  });
+  it('wrong continuity calls are explained and do not complete the step', () => {
+    for (const [id, step, bad] of [['payments-down', 'strategy', 'wait'], ['payments-down', 'comms', 'fine'], ['rising-water', 'safety', 'rescue'], ['flood-gates', 'strategy', 'blockall']] as const) {
+      const m = MISSIONS.find((x) => x.id === id) as ScenarioMission, sp = m.spec;
+      const { s, run } = runScript(m, { skipRecord: true });
+      void s; void run;
+      const g = new GameState(m); const r = new MissionRunner(g); r.start(); const d = dialogs(g);
+      g.flags.briefed = true;
+      for (const act of m.script) { const [k, v] = act as [string, any]; if (k === 'step' && v === step) break; if (k === 'pass') r.requestPass(v, 'desk'); else if (k === 'step') { const x = sp.steps.find((q) => q.id === v)!; g.selectedTool = x.tool === 'e' ? 'scanner' : x.tool; const at = Array.isArray(x.at) ? x.at[0] : x.at; if (x.tool === 'e') r.inspect(at); else r.interact(at); while (d.length) { const dl = d.shift(); if (dl.type === 'confirm') dl.onConfirm(); else if (dl.type === 'choice') { const st = sp.steps.find((q) => q.choice?.title === dl.title)!; dl.onChoose(st.choice!.options.find((o) => o.correct)!.id); } } } else if (k === 'contain') { g.selectedTool = 'quarantine'; r.interact(sp.contain!.find((q) => q.id === v)!.target); while (d.length) { const dl = d.shift(); if (dl.type === 'confirm') dl.onConfirm(); } } else if (k === 'wait') for (let t = 0; t < v * 2; t++) r.tick(0.5); }
+      const x = sp.steps.find((q) => q.id === step)!; g.selectedTool = 'scanner'; r.inspect(Array.isArray(x.at) ? x.at[0] : x.at);
+      const dl = d.shift(); expect(dl?.type, `${id}:${step}`).toBe('choice'); dl.onChoose(bad);
+      expect(g.flags['st_' + step], `${id}:${step}:${bad} must not complete`).toBeFalsy();
+      expect(g.latestResult?.text.length ?? 0).toBeGreaterThan(20);
+    }
+  });
+  it('the flood is a real state: it floods the room at the start and clears when facilities report it dry', () => {
+    const m = MISSIONS.find((x) => x.id === 'rising-water') as ScenarioMission;
+    const s = new GameState(m); const run = new MissionRunner(s); run.start();
+    expect(s.flags.flood_event_stream).toBe(true); expect(s.availability).toBeLessThan(100);
+    const { s: done } = runScript(m);
+    expect(done.flags.flood_event_stream).toBeFalsy(); expect(done.complete).toBe(true);
   });
 });

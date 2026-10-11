@@ -1,0 +1,66 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'flood-gates', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-1101', title: 'Who is flooding the gateway?', severity: 'High', sourceRoom: 'api_gateway', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_rate'],
+    evidenceNotes: { ev_rate: 'Requests are at 41,800 a minute against a normal 1,050. 92% come from client key ck-77 and the error rate is 38%.' },
+    keyObjective: 'Choose a proportionate response',
+    prompt: 'Match each fact about the flood to what it means for the response. One card is a distraction.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 's_src', label: 'Where to act', detail: 'The one thing to limit' }, { id: 's_how', label: 'What kind of problem', detail: 'Bug or attack' }, { id: 's_dup', label: 'The danger afterwards', detail: 'What to check at the end' }, { id: 's_tell', label: 'What the partner is told', detail: 'What is safe to share' }],
+      pieces: [
+        { id: 'p_key', label: 'Client key ck-77 sends 92% of traffic', detail: 'Gateway metrics', shape: 'circle', why: 'One key is the source, so only that key needs limiting.' },
+        { id: 'p_loop', label: 'Retries every 200 ms with no back-off', detail: 'Request samples', shape: 'hex', why: 'A retry loop is a bug, not an attack: a limit and a conversation fix it.' },
+        { id: 'p_same', label: '4 of 5 requests repeat the same payment reference', detail: 'Request samples', shape: 'diamond', why: 'Repeats can become duplicate payments: check the ledger at the end.' },
+        { id: 'p_share', label: 'The pattern and the limit, never raw payloads', detail: 'Policy', shape: 'square', why: 'Raw payloads may hold personal data.' },
+        { id: 'p_att', label: 'The internet is attacking our gateway', detail: 'Guess', shape: 'triangle', why: 'There is no evidence of an attack: the traffic comes from a known partner key.' }] },
+    correctMatches: { p_key: 's_src', p_loop: 's_how', p_same: 's_dup', p_share: 's_tell' },
+    hintText: ['Where does 92% of the traffic come from?', 'Is a retry loop with no back-off an attack or a bug?', 'Repeated payment references matter at the end.'],
+    clueOrder: ['ev_rate'],
+    failureFeedback: { default: 'Look at the metrics and the request pattern: one key, a retry loop, repeated references.' },
+    successFeedback: 'A targeted response is chosen: limit only the noisy key and protect payment traffic.',
+    actions: ['step:strategy'], requiredObjectives: ['p3'] },
+
+  { ...base, incidentId: 'INC-1102', title: 'Throttle only the noisy client key', severity: 'High', sourceRoom: 'api_gateway', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_rate'],
+    evidenceNotes: { ev_rate: 'No limit is set on ck-77. Payment requests from other clients wait in the same queue as the flood.' },
+    keyObjective: 'Limit the source and reserve capacity for payments',
+    prompt: 'Compare what a safe response expects with the current state. Mark every line that is missing or out of place, then submit.',
+    puzzleType: 'missing',
+    puzzlePieces: { type: 'missing', expectedTitle: 'A proportionate response expects', currentTitle: 'Current state of the API Gateway', items: [
+      { id: 'limit', label: 'A limit on the noisy client key', expected: 'ck-77 limited to 50 a minute', current: 'No limit: ck-77 sends 41,800 a minute', problem: 'Without a limit on the source the flood continues and crowds everyone out.', okWhy: '' },
+      { id: 'lane', label: 'A reserved lane for payment traffic', expected: 'Payments served first', current: 'Payments queue behind the flood', problem: 'Valid payments wait six minutes behind junk requests.', okWhy: '' },
+      { id: 'others', label: 'Other clients', expected: 'Unlimited as normal', current: 'Unlimited as normal', okWhy: 'Nothing is wrong with them: limiting them would punish everyone for one bug.' },
+      { id: 'size', label: 'Gateway capacity', expected: 'Normal size', current: 'Normal size', okWhy: 'Scaling up would hide the problem and cost money.' }] },
+    hintText: ['Read each line: does Current match Expected?', 'Two lines do not match: one about the source, one about the payments.', 'The limit on ck-77 and the payment lane are missing.'],
+    clueOrder: ['ev_rate'],
+    failureFeedback: { default: 'Compare Expected with Current line by line.' },
+    successFeedback: 'Only ck-77 is limited and payment traffic has a reserved lane. Everyone else is untouched.',
+    actions: ['contain:throttle', 'step:rule'], requiredObjectives: ['p4', 'p5'], containTarget: 'prop:api_gateway.auth_terminal' },
+
+  { ...base, incidentId: 'INC-1103', title: 'Prove it is over and nothing was duplicated', severity: 'Medium', sourceRoom: 'finance_core', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_pattern'],
+    evidenceNotes: { ev_pattern: '31,200 of the flooding requests repeated a payment reference. The ledger holds idempotency keys that should have rejected every repeat.' },
+    keyObjective: 'Confirm normal traffic and no duplicate postings',
+    prompt: 'Choose only the evidence that proves nothing was posted twice.',
+    puzzleType: 'verify',
+    puzzlePieces: { type: 'verify',
+      before: [['Duplicate requests received', '31,200'], ['Valid payments received', '412']],
+      after: [['Duplicate postings', '0'], ['Valid payments posted', '412']],
+      cards: [
+        { id: 'c1', label: 'Duplicate postings in the ledger: 0 of 31,200 repeats', detail: 'Ledger', confirms: true, why: 'The ledger itself shows no repeat was posted.' },
+        { id: 'c2', label: 'Valid payments received (412) equal valid payments posted (412)', detail: 'Reconciliation', confirms: true, why: 'Every real payment arrived once.' },
+        { id: 'c3', label: 'Idempotency keys rejected every repeated reference', detail: 'Ledger', confirms: true, why: 'The control that should stop duplicates worked.' },
+        { id: 'x1', label: 'Gateway traffic is back to 1,120 a minute', detail: 'Gateway', confirms: false, why: 'Good for availability, but it says nothing about the ledger.' },
+        { id: 'x2', label: 'The partner apologised', detail: 'Email', confirms: false, why: 'Politeness is not evidence.' },
+        { id: 'x3', label: 'The rate-limit rule was saved', detail: 'Config', confirms: false, why: 'A saved rule does not prove what was posted.' }] },
+    hintText: ['Proof comes from the ledger, not the gateway.', 'Compare repeats received with duplicates posted.', 'Pick the ledger counts and the idempotency result.'],
+    clueOrder: ['ev_pattern'],
+    failureFeedback: { default: 'Choose only the evidence from the ledger comparison.' },
+    successFeedback: 'No payment was posted twice, and the gateway is calm. The throttle can be lifted.',
+    actions: ['step:dedupe'], requiredObjectives: ['p7'] },
+];
+export default list;

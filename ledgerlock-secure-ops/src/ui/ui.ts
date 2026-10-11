@@ -40,6 +40,8 @@ export class UI {
   private icons: Record<string, string> = {};
   private unsub: (() => void)[] = [];
   private dialogOpen = false;
+  private lastInput = 0;
+  private inputBound = false;
   private pauseOpen = false;
   private teamPanel: TeamPanel | null = null;
   blueprint: BlueprintView | null = null;
@@ -131,7 +133,7 @@ export class UI {
     const card = (m: (typeof MISSIONS)[number]) => {
       const rec = campaign.data.missions[m.id]; const unlocked = campaign.isUnlocked(m, MISSIONS);
       const prim = m.goals.filter((g) => g.kind === 'primary'), opt = m.goals.filter((g) => g.kind === 'optional'), str = m.goals.filter((g) => g.kind === 'stretch');
-      const prev = CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
+      const prev = m.order === 9 ? MISSION_BY_ID['duplicate-ghost'] : CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
       const status = rec?.completed ? `<span class="chip good">✓ Completed · best ${rec.best}/100</span>` : unlocked ? '<span class="chip info">Available</span>' : `<span class="chip warn">🔒 Locked: complete ${esc(prev?.title ?? 'the tutorial')}</span>`;
       return `<div class="mcard ${unlocked ? '' : 'locked'}"><h3>${m.order ? m.order + '. ' : ''}${esc(m.title)} ${status}</h3><div class="small">${esc(m.tagline)}</div><div class="small"><i>${esc(m.theme)}</i></div>
         ${prim.length ? `<div class="small"><b>Primary objectives (${rec ? rec.primary.length : 0}/${prim.length})</b><ul>${prim.map((g) => `<li>${rec?.primary.includes(g.id) ? '✓' : '○'} ${esc(g.text)}</li>`).join('')}</ul></div>` : ''}
@@ -177,6 +179,7 @@ export class UI {
       ${sw('s-tut', 'Tutorial mode', 'Guided coaching: a step-by-step coach, a beacon on the target, free hints and slower incidents. Stretch goals are not counted.', d.tutorial)}
       <div class="sw"><label for="s-jev">JEV second opinions (AI)<small id="jev-state">Checking the server\u2026</small></label><input id="s-jev" type="checkbox" ${d.jev ? 'checked' : ''} style="width:22px;height:22px"></div>
       ${sw('s-team', 'Manager mode', 'Three teammates join the shift. You order them (or put them on Auto). Applies to the current and later missions.', d.team)}
+      ${sw('s-run', 'Auto keeps going', 'Once Auto is on it stays on from mission to mission, and the briefing and debrief screens continue by themselves. Any click or key press stops it.', d.autoRun)}
       ${sw('s-decide', 'Auto makes the calls', 'Teammates and Auto-play pick the best-practice answer to a choice or confirmation instead of asking you.', d.autoDecide)}
       ${sw('s-relaxed', 'Relaxed pace', 'Incidents progress at half speed.', d.relaxed)}
       ${sw('s-large', 'Larger text', 'Increases interface text size.', d.largeText)}
@@ -194,6 +197,7 @@ export class UI {
     refreshJev(); jev.on('change', refreshJev); void jev.check();
     q('s-jev')?.addEventListener('change', (e) => settings.set('jev', (e.target as HTMLInputElement).checked));
     q('s-team')?.addEventListener('change', (e) => settings.set('team', (e.target as HTMLInputElement).checked));
+    q('s-run')?.addEventListener('change', (e) => settings.set('autoRun', (e.target as HTMLInputElement).checked));
     q('s-decide')?.addEventListener('change', (e) => settings.set('autoDecide', (e.target as HTMLInputElement).checked));
     q('s-relaxed')?.addEventListener('change', (e) => settings.set('relaxed', (e.target as HTMLInputElement).checked));
     q('s-large')?.addEventListener('change', (e) => settings.set('largeText', (e.target as HTMLInputElement).checked));
@@ -221,6 +225,7 @@ export class UI {
   attachMission(state: GameState, runner: MissionRunner, scene: SceneApi): void {
     this.detachMission();
     this.state = state; this.runner = runner; this.scene = scene;
+    if (!this.inputBound) { this.inputBound = true; for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(ev, () => { this.lastInput = performance.now(); }, true); }
     state.tutorial = settings.data.tutorial;
     this.buildHud();
     this.unsub.push(
@@ -277,6 +282,7 @@ export class UI {
       if (a === 'how') this.showHowTo(() => this.showBriefing());
     });
     ($(s, 'button.primary') as HTMLElement).focus();
+    this.autoAdvance(s, 'button[data-a="go"]', 5, 'the shift');
   }
 
   openGoals(): void { if (this.state && !this.dialogOpen && !this.pauseOpen) this.openDialog({ type: 'goals' }); }
@@ -339,6 +345,7 @@ export class UI {
       if (a === 'missions') { this.leaveMissionVisuals(); this.showMissionSelect(); }
       if (a === 'title') this.showTitle();
     });
+    if (next) this.autoAdvance(s, 'button[data-a="next"]', 10, next.title);
   }
 
   // ===================================================================== HUD ====
@@ -729,7 +736,43 @@ export class UI {
       case 'board': this.paintBoard(wrap, close); break;
     }
     if (d.type !== 'access' && d.type !== 'board') focusPrimary();
+    this.autoResolve(d, wrap);
     wrap.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Escape') { e.stopPropagation(); close(); } });
+  }
+
+  /**
+   * Auto keeps the game moving: when Auto is on and nobody has touched the keyboard or mouse for a moment, popups that only
+   * ask for acknowledgement are closed, and choices and confirmations are answered with the best-practice option (when
+   * "Auto makes the calls" is on). A person who is interacting is never overridden.
+   */
+  private autoResolve(d: DialogSpec, wrap: HTMLElement): void {
+    const team = this.scene?.team; if (!team?.anyAuto() || d.type === 'access') return;
+    const decides = d.type === 'choice' || d.type === 'confirm';
+    if (decides && !settings.data.autoDecide) return;
+    if (performance.now() - this.lastInput < 2500) return;
+    const seen = this.lastInput;
+    window.setTimeout(() => {
+      if (!wrap.isConnected || this.lastInput !== seen || !this.state) return;
+      let btn: HTMLElement | null = null;
+      if (d.type === 'choice') { const best = this.state.mission.bestChoice?.[d.title] ?? d.options[0].id; btn = wrap.querySelector(`[data-o="${best}"]`); }
+      else btn = wrap.querySelector('[data-a="ok"]') ?? wrap.querySelector('button.primary');
+      if (!btn) return;
+      const title = 'title' in d ? d.title : d.type === 'alert' ? 'Alert' : d.type === 'goals' ? 'Goals' : 'Update';
+      btn.click(); this.toast(`Auto continued: <b>${esc(title)}</b>`, 'info');
+    }, decides ? 1800 : 1300);
+  }
+  /** With Auto-run on, move past a briefing or debrief screen by itself after a short pause (any input cancels it). */
+  private autoAdvance(screen: HTMLElement, selector: string, seconds: number, what: string): void {
+    if (!settings.data.autoRun) return;
+    const btn = screen.querySelector(selector) as HTMLElement | null; if (!btn) return;
+    const note = el('div', { class: 'small', role: 'status' }, ''); note.style.marginTop = '8px'; (screen.querySelector('.card') ?? screen).appendChild(note);
+    const seen = this.lastInput; let left = seconds;
+    const tick = () => {
+      if (!screen.isConnected || this.lastInput !== seen) { clearInterval(h); if (screen.isConnected) note.textContent = 'Auto-advance cancelled: you took over.'; return; }
+      note.textContent = `Auto continues to ${what} in ${left}s. Click or press any key to stay here.`;
+      if (left-- <= 0) { clearInterval(h); btn.click(); }
+    };
+    const h = window.setInterval(tick, 1000); tick();
   }
 
   private paintAccess(wrap: HTMLElement, readerRoom: RoomId | undefined, close: (a?: () => void) => void, doorId?: string): void {

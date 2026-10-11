@@ -60,6 +60,8 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   /** Everything that belongs to a room, so undiscovered rooms can be drawn as silhouettes. */
   private roomObjs = new Map<RoomId, { floors: { img: Phaser.GameObjects.Image; tint: number | null }[]; walls: Phaser.GameObjects.Image[]; props: Phaser.GameObjects.Image[] }>();
   private fogSig = '';
+  private water!: Phaser.GameObjects.Graphics;
+  private waterLabels = new Map<RoomId, Phaser.GameObjects.Text>();
   private objsOf(id: RoomId) { let o = this.roomObjs.get(id); if (!o) { o = { floors: [], walls: [], props: [] }; this.roomObjs.set(id, o); } return o; }
   private walls: { img: Phaser.GameObjects.Image; gx: number; gy: number }[] = [];
   private propSprites = new Map<string, Phaser.GameObjects.Image>();
@@ -101,6 +103,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.flow = new FlowRenderer(this);
     this.guide = this.add.graphics().setDepth(19000);
     this.highlight = this.add.graphics().setDepth(19500);
+    this.water = this.add.graphics().setDepth(9000);
     this.coach = this.add.graphics().setDepth(21800);
     this.buildPlayer();
     this.buildTeam();
@@ -271,10 +274,11 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       walkTo: (c) => this.walkTo(c), idle: () => !this.to && !this.path.length,
       cancel: () => { this.path = []; }, pose: (t) => this.setPoseFor(t),
     };
-    this.team = new TeamController(this.state, this.runner, { team: settings.data.team, spawn, body, autoDecide: () => settings.data.autoDecide,
+    this.team = new TeamController(this.state, this.runner, { team: settings.data.team, spawn, body, autoDecide: () => settings.data.autoDecide, onAuto: (any) => { if (settings.data.autoRun !== any && !this.closing) settings.set('autoRun', any); },
       jevOn: () => jev.enabled,
       advise: async (spec) => { const r = await jev.decide(this.state, spec.title, spec.body, spec.options); return r ? { id: r.choice, confidence: r.confidence } : null; } });
     this.unsub.push(() => this.team.dispose());
+    if (settings.data.autoRun) this.team.setAllAuto(true);          // Auto keeps going across missions until someone switches it off
     for (const m of this.team.members) {
       if (m.external) continue;
       const img = makeImage(this, 'characters', 'eng_se_idle_0', 0, 0).setTint(m.color);
@@ -291,6 +295,24 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     const p = this.S(m.pos.x, m.pos.y);
     this.followPlayer = false; this.cameras.main.stopFollow(); this.cameras.main.pan(p.x, p.y, 450, 'Sine.easeInOut');
   }
+  /** A disaster in a room (flag `flood_<room>`): a rippling water layer over the floor and a warning label until it is cleared. */
+  private drawWater(time: number): void {
+    const g = this.water; g.clear();
+    for (const r of ROOMS) {
+      const on = !!this.state.flags['flood_' + r.id];
+      const lbl = this.waterLabels.get(r.id);
+      if (!on) { lbl?.setVisible(false); continue; }
+      const k = settings.data.reducedMotion ? 0 : 1, wave = 0.06 * Math.sin(time / 500) * k;
+      const pts = [[r.x0 + 1, r.y0 + 1], [r.x0 + r.w - 1, r.y0 + 1], [r.x0 + r.w - 1, r.y0 + r.h - 1], [r.x0 + 1, r.y0 + r.h - 1]].map(([x, y]) => this.S(x, y));
+      g.fillStyle(0x2f9bd8, 0.42 + wave).fillPoints(pts.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+      g.lineStyle(2, 0x9fe3ff, 0.7).strokePoints(pts.map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+      for (let i = 1; i < 6; i++) { const a = this.S(r.x0 + 1, r.y0 + 1 + (i * (r.h - 2)) / 6 + wave * 4), b = this.S(r.x0 + r.w - 1, r.y0 + 1 + (i * (r.h - 2)) / 6 + wave * 4); g.lineStyle(1, 0xcdf3ff, 0.35).lineBetween(a.x, a.y, b.x, b.y); }
+      let t = lbl; const c = this.S(r.x0 + r.w / 2, r.y0 + r.h / 2);
+      if (!t) { t = this.add.text(c.x, c.y - 40, '', { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#0b1424', backgroundColor: '#9fe3ff', padding: { x: 5, y: 2 }, fontStyle: 'bold' }).setOrigin(0.5).setDepth(15200).setResolution(2); this.waterLabels.set(r.id, t); }
+      t.setText(this.state.flags.st_safety ? '≈ FLOODED · power isolated · keep out' : '≈ FLOODING · live power · keep out').setVisible(true).setPosition(c.x, c.y - 40);
+    }
+  }
+
   private syncTeam(time: number): void {
     const on = this.team.crewOn;
     for (const [id, sp] of this.crewSprites) {
@@ -669,6 +691,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     }
     this.syncTeam(time);
     this.syncEntities(time);
+    this.drawWater(time);
     const rerouted = new Set(Object.entries(this.state.contained).filter(([, c]) => c.rerouted).map(([k]) => k.replace('route:', '')));
     this.flow.draw(time, this.state.routeStates, this.state.selectedTarget, settings.data.reducedMotion, rerouted);
     this.updatePrompt();

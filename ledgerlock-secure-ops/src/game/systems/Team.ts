@@ -66,6 +66,8 @@ export interface TeamOptions {
   /** JEV second opinion (optional). When it is on, choices go to JEV first; teammates only act on it when it is confident. */
   jevOn?: () => boolean;
   advise?: (spec: Extract<DialogSpec, { type: 'choice' }>) => Promise<{ id: string; confidence: number } | null>;
+  /** Called whenever anyone is switched on or off Auto (the UI remembers it so Auto keeps going across missions). */
+  onAuto?: (any: boolean) => void;
 }
 /** How sure JEV must be before a teammate acts on its answer without asking the manager. */
 export const JEV_GATE = 0.75;
@@ -112,12 +114,25 @@ export class TeamController {
   // ------------------------------------------------------------ commands ----
   setAuto(id: string, on: boolean): void {
     const m = this.member(id); if (!m) return;
-    m.auto = on;
+    m.auto = on; this.lastProgAt = this.s.elapsed;
     if (!on && m.phase !== 'working' && m.phase !== 'waiting') this.stop(m, 'Standing by');
     else if (on && m.phase === 'idle') m.note = 'Looking for work';
+    this.opts.onAuto?.(this.anyAuto());
   }
   setAllAuto(on: boolean): void { for (const m of this.live()) this.setAuto(m.id, on); }
   anyAuto(): boolean { return this.live().some((m) => m.auto); }
+  /** Auto-run progress watchdog: if nothing has advanced for a while, forget old failures so everyone tries again. */
+  private lastProg = -1; private lastProgAt = 0; nudges = 0;
+  private watchdog(): void {
+    const s = this.s; if (!this.anyAuto()) return;
+    const prog = this.actions.filter((a) => a.done(s)).length * 1000 + s.evidence.size * 10 + this.members.reduce((n, m) => n + m.done, 0);
+    if (prog !== this.lastProg) { this.lastProg = prog; this.lastProgAt = s.elapsed; return; }
+    if (s.elapsed - this.lastProgAt < 40 || this.members.some((m) => m.pending && !m.pending.resolved)) return;
+    this.lastProgAt = s.elapsed; this.nudges++;
+    for (const m of this.live()) { m.coolUntil = {}; m.fails = {}; if (m.phase === 'blocked' || (m.phase === 'idle' && !m.task)) { this.release(m); m.phase = 'idle'; m.idleFor = 1; } }
+    this.claims.clear();
+    s.log('Auto: nothing has moved for a while, so everyone is trying again.', 'info');
+  }
 
   /** Order a teammate to use a tool on a target, or to take one of the playbook actions. */
   order(id: string, o: { tool: ToolId | 'e'; target: string } | { actionId: string }): string | null {
@@ -288,7 +303,7 @@ export class TeamController {
   // ------------------------------------------------------------ the loop ----
   update(dt: number): void {
     const s = this.s; if (s.complete) return;
-    this.tickWaits();
+    this.tickWaits(); this.watchdog();
     for (const m of this.live()) {
       if (m.external) m.pos = m.external.pos(); else if (m.id !== 'you') this.recover(m, dt);
       switch (m.phase) {

@@ -1,0 +1,68 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'rising-water', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-1001', title: 'Water in the Event Stream Hall: is it safe?', severity: 'Critical', sourceRoom: 'event_stream', affectedRouteIds: ['finance_event_mirror'],
+    evidenceIds: ['ev_telemetry'],
+    evidenceNotes: { ev_telemetry: 'Four leak sensors report 6 cm of water and rising. Lanes 3 and 4 are at floor level and UPS tray 2 is wet. Nobody is inside and power to the hall is live.' },
+    keyObjective: 'Put people first: isolate and close the hall',
+    prompt: 'Match each reading to what it tells you. One card is not a reason to act.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 's_why', label: 'Why this is an emergency', detail: 'What makes it urgent' }, { id: 's_nobody', label: 'Why nobody goes in', detail: 'The danger to people' }, { id: 's_risk', label: 'What is at risk first', detail: 'Where the water arrives first' }, { id: 's_safe', label: 'Who is safe right now', detail: 'The good news' }],
+      pieces: [
+        { id: 'p_water', label: 'Water 6 cm and rising on four sensors', detail: 'Facilities telemetry', shape: 'circle', why: 'Four sensors agree and the level is rising: this is a real, growing flood.' },
+        { id: 'p_power', label: 'Power to the hall is still live', detail: 'Facilities telemetry', shape: 'hex', why: 'Water and live power can kill: nobody enters until power is isolated.' },
+        { id: 'p_lanes', label: 'Lanes 3 and 4 at floor level', detail: 'Lane layout', shape: 'diamond', why: 'The lowest lanes will be hit first.' },
+        { id: 'p_people', label: 'No people in the hall', detail: 'Door log', shape: 'square', why: 'Nobody is inside, so there is time to isolate remotely.' },
+        { id: 'p_report', label: 'Morning reporting is at 06:00', detail: 'Schedule', shape: 'triangle', why: 'A deadline, but not a reason to take a safety risk.' }] },
+    correctMatches: { p_water: 's_why', p_power: 's_nobody', p_lanes: 's_risk', p_people: 's_safe' },
+    hintText: ['People come before equipment and before deadlines.', 'Water plus live power is the danger to anyone who goes in.', 'The lowest lanes will be wet first.'],
+    clueOrder: ['ev_telemetry'],
+    failureFeedback: { default: 'Think about what each fact means for safety first, then for the equipment.' },
+    successFeedback: 'The hall is isolated and closed. Facilities are pumping. Nobody went in.',
+    actions: ['step:safety'], requiredObjectives: ['p2'] },
+
+  { ...base, incidentId: 'INC-1002', title: 'Stop the writes and fail over to Site B', severity: 'Critical', sourceRoom: 'event_stream', affectedRouteIds: ['finance_event_mirror'],
+    evidenceIds: ['ev_telemetry'],
+    evidenceNotes: { ev_telemetry: 'The Finance Event Mirror is still writing into the hall where lanes 3 and 4 are underwater. A standby replica exists at Site B (lag 90 seconds, promotion about 10 minutes).' },
+    keyObjective: 'Stop writes into the wet hall and fail over within the RTO',
+    prompt: 'Drag cables so finance events stop going into the wet hall and the consumers move to the Site B replica.',
+    puzzleType: 'cable',
+    puzzlePieces: { type: 'cable', ports: [
+      { id: 'mirror', side: 'source', label: 'Finance Event Mirror', detail: 'writes into the hall' },
+      { id: 'consumers', side: 'source', label: 'Event consumers', detail: 'Fabric Bronze, Silver, Gold' },
+      { id: 'hold', side: 'dest', label: 'Hold writes (narrow)', detail: 'only this route' },
+      { id: 'siteb', side: 'dest', label: 'Site B replica', detail: 'lag 90 s · promote ~10 min' },
+      { id: 'hall', side: 'dest', label: 'Keep using the hall', detail: 'power isolated, water rising' }] },
+    validConnections: [['mirror', 'hold'], ['consumers', 'siteb']],
+    hintText: ['Do not keep writing into a flooded room.', 'The replica meets both the RTO and the RPO.', 'Hold only the mirror route: card and bank routes do not use the hall.'],
+    clueOrder: ['ev_telemetry'],
+    failureFeedback: { 'consumers>hall': 'The hall is isolated and flooding: nothing can run there.', default: 'Hold the mirror writes, and move the consumers to the standby replica.' },
+    successFeedback: 'The mirror is held and the consumers run from Site B, inside the RTO.',
+    actions: ['contain:stopwrites'], fixActions: ['step:failover'], requiredObjectives: ['p4'], containTarget: 'route:finance_event_mirror' },
+
+  { ...base, incidentId: 'INC-1003', title: 'Prove no events were lost', severity: 'High', sourceRoom: 'finance_core', affectedRouteIds: ['finance_event_mirror'],
+    evidenceIds: ['ev_dependency'],
+    evidenceNotes: { ev_dependency: 'The replica was 90 seconds behind when the hall was isolated. The finance journal holds everything since then and can be replayed.' },
+    keyObjective: 'Confirm the recovery point: nothing lost',
+    prompt: 'Choose only the evidence that proves no events were lost.',
+    puzzleType: 'verify',
+    puzzlePieces: { type: 'verify',
+      before: [['Replica events', '118,361'], ['Ledger postings', '118,402']],
+      after: [['After replay from the journal', '118,402'], ['Gap', '0']],
+      cards: [
+        { id: 'c1', label: 'Replica plus the replayed journal equals the ledger (118,402)', detail: 'Reconciliation', confirms: true, why: 'Both sides now hold exactly the same events.' },
+        { id: 'c2', label: 'The gap before the replay was 41 events, equal to 90 seconds of traffic', detail: 'Reconciliation', confirms: true, why: 'The gap is fully explained by the replica lag, and it was closed.' },
+        { id: 'c3', label: 'No events are waiting in the replay queue', detail: 'Replay status', confirms: true, why: 'Nothing is still waiting to be replayed.' },
+        { id: 'x1', label: 'The reporting dashboard looks green', detail: 'Dashboard', confirms: false, why: 'A green screen is not a count: it could hide missing events.' },
+        { id: 'x2', label: 'Site B has been running for 20 minutes', detail: 'Uptime', confirms: false, why: 'Being up does not show nothing was lost.' },
+        { id: 'x3', label: 'Facilities report the hall is dry', detail: 'Facilities', confirms: false, why: 'Good news about the building, but unrelated to the data.' }] },
+    hintText: ['Proof is a count, compared on both sides.', 'Uptime and dashboards are not proof of completeness.', 'Pick the matching totals and the explained gap.'],
+    clueOrder: ['ev_dependency'],
+    failureFeedback: { default: 'Choose only the evidence that compares the replica with the ledger.' },
+    successFeedback: 'The recovery point is proven: replica and ledger match at 118,402 events.',
+    actions: ['step:rpo'], requiredObjectives: ['p5'] },
+];
+export default list;
