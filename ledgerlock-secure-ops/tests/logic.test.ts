@@ -3,6 +3,7 @@ import { DOORS, DOOR_BY_ID, GATE, GRID, LINKS, LINK_BY_ID, LINK_RULES, LAYOUT_JU
 import { PASSES, PASS_BY_ROOM } from '../src/data/passes';
 import { ROUTES, routePoints } from '../src/data/routes';
 import { findPath, nearestWalkable, walkableFor } from '../src/game/systems/Grid';
+import { accessFor, standFor } from '../src/game/systems/Reach';
 import { GameState } from '../src/game/systems/GameState';
 import { MissionRunner } from '../src/game/systems/MissionRunner';
 import { computeScore } from '../src/game/systems/Scoring';
@@ -79,6 +80,11 @@ describe('facility map', () => {
     for (const r of ROOMS) if (r.id !== 'secure_ops') { const d = Math.hypot(r.x0 + r.w / 2 - cx, r.y0 + r.h / 2 - cy); expect(d, r.id).toBeGreaterThan(8); }
     expect(Math.abs(cx - GRID.w / 2)).toBeLessThan(GRID.w * 0.15);          // roughly central in the world
     expect(MISSIONS.every((m) => m.startRoom === 'secure_ops')).toBe(true);
+  });
+  it('the Identity & Access Desk, Incident Wall, overview terminal and Access Desk can all be used from the spawn with only the ops pass', () => {
+    const a = ROOM_BY_ID.secure_ops, passes = new Set<PassId>(['ops_pass']), from = nearestWalkable(walkableFor(passes), a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
+    for (const k of ['identity_desk', 'incident_wall', 'map_table', 'access_desk', 'evidence_board']) expect(standFor(`prop:secure_ops.${k}`, from, passes), k).not.toBeNull();
+    expect(accessFor('prop:secure_ops.identity_desk', passes)).toBe(true);
   });
   it('decorative things (entrance gate, external docks) stand on open ground, not on rooms or corridors', () => {
     for (let x = ENTRANCE.x; x < ENTRANCE.x + ENTRANCE.w; x++) for (let y = ENTRANCE.y - 1; y <= ENTRANCE.y; y++) expect(GRID.kind[y][x], `entrance ${x},${y}`).toBe('void');

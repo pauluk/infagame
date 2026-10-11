@@ -85,7 +85,7 @@ await page.click('#dialog button[data-a=ok]');
 ok('Payments Audit Pass granted');
 
 // 3. walk to card payments through corridors
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 28 + 4})');   // inside B3
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:card_payments'))');   // inside B3
 for (let i = 0; i < 160 && !(await flag('visited_card_payments')); i++) await page.waitForTimeout(150);
 if (!(await flag('visited_card_payments'))) await fail('did not reach card payments');
 ok('walked to Card Payments through corridors');
@@ -118,15 +118,15 @@ ok('lens + diagnosis (wrong answer retried)');
 await shot('04-route');
 
 // 7. event trace pass at the card room reader, then event stream
-const readerFor = (room, side) => `reader:door:${room}.${side}`;
-await walkNear(readerFor('event_stream', 's'));
-await S('(sc,t)=>sc.selectTarget(t)', readerFor('event_stream', 's'));
+const readerFor = (room, from) => `reader:door:${room}.${from}`;   // the reader on `room`'s door that opens onto `from` (a concourse)
+await walkNear(readerFor('event_stream', 'jnw'));
+await S('(sc,t)=>sc.selectTarget(t)', readerFor('event_stream', 'jnw'));
 await key('e'); await dialog('table.t');
 await page.click('#dialog button[data-req=event_trace_pass]'); await page.waitForTimeout(200);
 await page.click('#dialog button[data-a=ok]');
 if (!(await S('(sc)=>sc.state.passes.has("event_trace_pass")'))) await fail('event trace pass');
 ok('Event Trace Pass granted at door reader');
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 8 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:event_stream'))');
 for (let i = 0; i < 200 && !(await flag('visited_event_stream')); i++) await page.waitForTimeout(150);
 if (!(await flag('visited_event_stream'))) await fail('did not reach event stream');
 ok('walked to Event Stream Hall');
@@ -136,13 +136,13 @@ await key('e'); await clickDialog('button[data-a=ok]');
 if (!(await flag('traceEvidence'))) await fail('trace evidence');
 ok('replay trace retrieved');
 // 8. ledger pass at the event stream south door reader
-await walkNear(readerFor('finance_core', 'n'));
-await S('(sc,t)=>sc.selectTarget(t)', readerFor('finance_core', 'n'));
+await walkNear(readerFor('finance_core', 'jw'));
+await S('(sc,t)=>sc.selectTarget(t)', readerFor('finance_core', 'jw'));
 await key('e'); await dialog('table.t');
 await page.click('#dialog button[data-req=ledger_read_pass]'); await page.waitForTimeout(200);
 await page.click('#dialog button[data-a=ok]');
 if (!(await S('(sc)=>sc.state.passes.has("ledger_read_pass")'))) await fail('ledger pass');
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 18 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:finance_core'))');
 for (let i = 0; i < 200 && !(await flag('visited_finance_core')); i++) await page.waitForTimeout(150);
 await walkNear('prop:finance_core.gl');
 await S('(sc,t)=>sc.selectTarget(t)', 'prop:finance_core.gl');
@@ -167,14 +167,14 @@ ok('valid receipts rerouted via Card Receipt route');
 await shot('07-rerouted');
 
 // 10. patch in card payments
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 28 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:card_payments'))');
 for (let i = 0; i < 200 && (await S('(sc)=>sc.state.player.room')) !== 'card_payments'; i++) await page.waitForTimeout(150);
 await walkNear('prop:card_payments.notifier');
 await key('4'); await S('(sc,t)=>sc.selectTarget(t)', 'prop:card_payments.notifier'); await key('e');
 if (!(await flag('patched'))) await fail('patch');
 ok('patched Settlement Notifier');
 // 11. restore buffer
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 8 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:event_stream'))');
 for (let i = 0; i < 220 && (await S('(sc)=>sc.state.player.room')) !== 'event_stream'; i++) await page.waitForTimeout(150);
 await walkNear('prop:event_stream.replay_buffer');
 await key('6'); await S('(sc,t)=>sc.selectTarget(t)', 'prop:event_stream.replay_buffer'); await key('e');
@@ -182,7 +182,7 @@ await clickDialog('button.primary'); await page.waitForTimeout(150);
 if (!(await flag('purged'))) await fail('restore');
 ok('replay buffer restored to clean checkpoint');
 // 12. reconcile
-await S('(sc)=>sc.walkTo({x: 20 + 5, y: 18 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:finance_core'))');
 for (let i = 0; i < 220 && (await S('(sc)=>sc.state.player.room')) !== 'finance_core'; i++) await page.waitForTimeout(150);
 await walkNear('prop:finance_core.ar');
 await key('7'); await S('(sc,t)=>sc.selectTarget(t)', 'prop:finance_core.ar'); await key('e');
@@ -198,13 +198,13 @@ await key('1'); await key('e');
 if (!(await flag('flowVerified'))) await fail('flow verify');
 ok('containment released; feed verified (valid receipts flowing, no duplicates)');
 // 14. fabric pass + verify
-await walkNear(readerFor('fabric_platform', 's'));
-await S('(sc,t)=>sc.selectTarget(t)', readerFor('fabric_platform', 's'));
+await walkNear(readerFor('fabric_platform', 'jn'));
+await S('(sc,t)=>sc.selectTarget(t)', readerFor('fabric_platform', 'jn'));
 await key('e'); await dialog('table.t');
 await page.click('#dialog button[data-req=fabric_observer_pass]'); await page.waitForTimeout(200);
 await page.click('#dialog button[data-a=ok]');
 if (!(await S('(sc)=>sc.state.passes.has("fabric_observer_pass")'))) await fail('fabric pass');
-await S('(sc)=>sc.walkTo({x: 32 + 5, y: 8 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:fabric_platform'))');
 for (let i = 0; i < 260 && (await S('(sc)=>sc.state.player.room')) !== 'fabric_platform'; i++) await page.waitForTimeout(150);
 await walkNear('prop:fabric_platform.pipeline_display');
 await S('(sc,t)=>sc.selectTarget(t)', 'prop:fabric_platform.pipeline_display'); await key('e');
@@ -215,7 +215,7 @@ ok('verified in Fabric room (demo data badge visible)');
 const badge = await page.$('#panelmodal .badge-demo'); if (!badge) await fail('Demo data badge missing');
 await page.click('#panelmodal button[data-a=close]');
 // 15. back to secure ops, file report
-await S('(sc)=>sc.walkTo({x: 8 + 5, y: 28 + 4})');
+await S('(sc)=>sc.walkTo(sc.__targetCell('room:secure_ops'))');
 for (let i = 0; i < 300 && (await S('(sc)=>sc.state.player.room')) !== 'secure_ops'; i++) await page.waitForTimeout(150);
 await walkNear('prop:secure_ops.evidence_board');
 await S('(sc,t)=>sc.selectTarget(t)', 'prop:secure_ops.evidence_board'); await key('e');
