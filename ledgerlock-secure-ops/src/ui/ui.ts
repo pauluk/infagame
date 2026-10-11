@@ -5,6 +5,7 @@ import type { MissionRunner } from '../game/systems/MissionRunner';
 import type { SceneApi } from '../game/sceneApi';
 import { settings } from '../game/systems/Settings';
 import { sfx } from '../game/systems/Sfx';
+import { bgInterval, bgTimeout, bgClear } from '../background';
 import { computeScore } from '../game/systems/Scoring';
 import { TOOLS, TOOL_BY_ID } from '../data/tools';
 import { CAMPAIGN_GOAL, CAMPAIGN_MISSIONS, MISSIONS, MISSION_BY_ID } from '../data/missions';
@@ -784,7 +785,7 @@ export class UI {
     if (decides && !settings.data.autoDecide) return;
     if (performance.now() - this.lastInput < 2500) return;
     const seen = this.lastInput;
-    window.setTimeout(() => {
+    bgTimeout(() => {
       if (!wrap.isConnected || this.lastInput !== seen || !this.state) return;
       let btn: HTMLElement | null = null;
       if (d.type === 'choice' || d.type === 'meeting') { const best = this.state.mission.bestChoice?.[d.title] ?? d.options[0].id; btn = wrap.querySelector(`[data-o="${best}"]`); }
@@ -801,11 +802,11 @@ export class UI {
     const note = el('div', { class: 'small', role: 'status' }, ''); note.style.marginTop = '8px'; (screen.querySelector('.card') ?? screen).appendChild(note);
     const seen = this.lastInput; let left = seconds;
     const tick = () => {
-      if (!screen.isConnected || this.lastInput !== seen) { clearInterval(h); if (screen.isConnected) note.textContent = 'Auto-advance cancelled: you took over.'; return; }
+      if (!screen.isConnected || this.lastInput !== seen) { bgClear(h); if (screen.isConnected) note.textContent = 'Auto-advance cancelled: you took over.'; return; }
       note.textContent = `Auto continues to ${what} in ${left}s. Click or press any key to stay here.`;
-      if (left-- <= 0) { clearInterval(h); btn.click(); }
+      if (left-- <= 0) { bgClear(h); btn.click(); }
     };
-    const h = window.setInterval(tick, 1000); tick();
+    const h = bgInterval(tick, 1000); tick();
   }
 
   private paintAccess(wrap: HTMLElement, readerRoom: RoomId | undefined, close: (a?: () => void) => void, doorId?: string): void {

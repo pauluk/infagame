@@ -6,6 +6,7 @@ import { FacilityScene } from './game/scenes/FacilityScene';
 import { DebriefScene } from './game/scenes/DebriefScene';
 import { UI } from './ui/ui';
 import { app } from './app';
+import { keepRunningInBackground } from './background';
 
 const ui = new UI(document.getElementById('ui')!);
 app.ui = ui;
@@ -19,5 +20,6 @@ app.game = new Phaser.Game({
   render: { antialias: true, roundPixels: true },
   input: { keyboard: { capture: [] } },
 });
+keepRunningInBackground(app.game);
 (window as unknown as { __ledgerlock: typeof app }).__ledgerlock = app;   // handy for debugging and the e2e test
 ui.showTitle(true);

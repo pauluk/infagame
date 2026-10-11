@@ -79,6 +79,8 @@ Missions 9 to 11 (open after the tutorial): **Payments Down** (a payment run can
 ### Cyber missions and the BCP Command Centre
 Missions 12 to 14 (open after the tutorial): **Quiet Malware**, **Ransom Note** and **Worm in the Wires**. The manager reports to the Bronze team in the **BCP Command Centre**, hears from the service managers, takes decisions together and agrees communications. See `docs/cyber-missions.md`.
 
+Auto keeps playing when the tab or window is in the background (a Web Worker supplies the clock, since browsers stop animation frames in hidden tabs).
+
 Missions 15 and 16 (open after the tutorial): **Blue Lantern** (emergency payment continuity: separated duties, a governed provider connection, a tactile payment workbench, dual review and a four-way reconciliation) and **Blue Lantern: The Gap** (the provider's paperwork has lapsed: the right answer is to hold, escalate and defer). Fictional and simulated only. See `docs/blue-lantern.md`.
 
 ## Facility map
