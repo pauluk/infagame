@@ -5,6 +5,7 @@ import type { MissionRunner } from '../game/systems/MissionRunner';
 import type { SceneApi } from '../game/sceneApi';
 import { settings } from '../game/systems/Settings';
 import { sfx } from '../game/systems/Sfx';
+import { nearestWalkable, walkableFor } from '../game/systems/Grid';
 import { bgInterval, bgTimeout, bgClear } from '../background';
 import { computeScore } from '../game/systems/Scoring';
 import { TOOLS, TOOL_BY_ID } from '../data/tools';
@@ -564,9 +565,15 @@ export class UI {
     const sc2 = this.scene!;
     // a teammate: look at them
     const mate = sc2.team.crewOn ? sc2.team.crew.find((m) => Math.hypot((m.pos.x * sc + ox - px), (m.pos.y * sc + oy - py)) < 12) : undefined;
-    if (mate) { sfx.click(); sc2.focusMember(mate.id); this.toast(`Showing <b>${esc(mate.name)}</b>: ${esc(mate.note)}`, 'info'); return; }
+    if (mate) { sfx.click(); sc2.team.select(sc2.team.selected === mate.id ? null : mate.id); sc2.focusMember(mate.id); this.toast(`Showing <b>${esc(mate.name)}</b>: ${esc(mate.note)}`, 'info'); return; }
     const room = ROOMS.find((q) => gx >= q.x0 && gx < q.x0 + q.w && gy >= q.y0 && gy < q.y0 + q.h);
     sfx.click();
+    const who = sc2.team.selected && sc2.team.crewOn ? sc2.team.member(sc2.team.selected) : null;
+    if (who) {
+      const goal = room ? nearestWalkable(walkableFor(this.state!.passes), room.x0 + room.w / 2, room.y0 + room.h / 2, 5) : { x: Math.floor(gx), y: Math.floor(gy) };
+      const err = goal ? sc2.team.goTo(who.id, goal) : 'No way in there.';
+      this.toast(err ? esc(err) : `<b>${esc(who.name)}</b> is heading ${room ? 'to ' + esc(room.name) : 'there'}.`, err ? 'warn' : 'good'); return;
+    }
     if (room) { sc2.selectTarget('room:' + room.id); this.mmSelected = room.id; const r = sc2.setWaypoint('room:' + room.id); if (!r.ok) this.toast(esc(r.note), 'warn'); else this.toast(esc(r.note), 'info'); return; }
     if (GRID.kind[Math.floor(gy)]?.[Math.floor(gx)] === 'corridor') { sc2.walkTo({ x: Math.floor(gx), y: Math.floor(gy) }); this.toast('Walking there.', 'info'); }
   }

@@ -23,6 +23,7 @@ export class TeamPanel {
     btn.onclick = () => { this.open = !this.open; this.sig = ''; this.tick(); };
     this.box.addEventListener('click', (e) => this.onClick(e));
     this.box.addEventListener('change', (e) => this.onChange(e));
+    this.box.addEventListener('keydown', (e) => { const el = e.target as HTMLElement; if ((e.key === 'Enter' || e.key === ' ') && el.classList.contains('tm')) { e.preventDefault(); el.click(); } });
     this.tick();
   }
 
@@ -47,7 +48,7 @@ export class TeamPanel {
     document.body.classList.toggle('team-open', this.open && !s.complete);
     if (!this.open) return;
     const sug = t.crew.map((m) => t.suggestion(m)?.id ?? '-').join(',');
-    const sig = [crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}${Math.round(m.focus / 4)}${m.resting}${Math.round(m.spent)}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '') + (i.text?.length ?? 0)).slice(0, 8).join(',')].join(';');
+    const sig = [t.selected, crewOn, s.speed, settings.data.autoDecide, this.more, s.selectedTool, s.selectedTarget, sug, t.members.map((m) => `${m.id}${m.auto}${m.phase}${m.note}${Math.round(m.focus / 4)}${m.resting}${Math.round(m.spent)}`).join('|'), t.inbox.map((i) => i.id + (i.resolved ? 'x' : '') + (i.text?.length ?? 0)).slice(0, 8).join(',')].join(';');
     if (sig === this.sig) return;
     this.sig = sig; this.render();
   }
@@ -64,7 +65,7 @@ export class TeamPanel {
       const fat = fatigueOf(m.focus), focus = Math.round(m.focus);
       const adhoc = (tool: 'e' | typeof s.selectedTool): PlayAction => ({ id: 'q', label: '', role: 'investigator', kind: 'use', target: sel ?? undefined, tool, after: [], done: () => false, ready: () => true });
       const price = (a: PlayAction) => { const q = t.quote(m, a); return `${q.cost} effort \u00B7 ~${q.seconds}s${q.specialist ? '' : ' \u00B7 not their specialty (\u00D71.5)'}${q.enough ? '' : ' \u00B7 too tired: needs a break'}`; };
-      return `<div class="tm ${m.phase}${pend ? ' ask' : ''}" data-m="${m.id}">
+      return `<div class="tm ${m.phase}${pend ? ' ask' : ''}${t.selected === m.id ? ' sel' : ''}" data-m="${m.id}" ${crew ? 'tabindex="0" role="button" aria-pressed="' + (t.selected === m.id) + '" aria-label="Select ' + esc(m.name) + ' to give orders"' : ''}>
         <i class="dot" style="background:#${m.color.toString(16).padStart(6, '0')}"></i>
         <div class="who"><b>${esc(m.name)}</b> <small>${esc(m.title)}</small><div class="st">${esc(m.note)}</div>
           ${crew ? `<div class="meter ${fat}" role="meter" aria-label="${esc(m.name)}'s Focus" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${focus}"><i style="width:${focus}%"></i></div><small class="fx">Focus ${focus}% \u00B7 ${fat === 'fresh' ? 'Fresh' : fat === 'steady' ? 'Steady' : fat === 'tired' ? 'Tired (slower)' : 'Exhausted'}${m.resting ? ' \u00B7 on a break' : ''} \u00B7 spent ${Math.round(m.spent)} effort</small>` : ''}</div>
@@ -102,7 +103,17 @@ export class TeamPanel {
   }
 
   private onClick(e: MouseEvent): void {
-    const b = (e.target as HTMLElement).closest('button'); if (!b || b.tagName !== 'BUTTON') return;
+    const tg = e.target as HTMLElement;
+    if (!tg.closest('button, input, label, select')) {
+      const card = this.memberOf(tg);
+      if (card && card.id !== 'you') {
+        const was = this.team.selected === card.id; this.team.select(was ? null : card.id); sfx.click();
+        if (!was) this.host.toast(`<b>${esc(card.name)}</b> selected. Click the map to send them somewhere, or click a component to give them a job.`, 'info');
+        this.sig = ''; this.tick();
+      }
+      return;
+    }
+    const b = tg.closest('button'); if (!b || b.tagName !== 'BUTTON') return;
     const k = b.dataset.t; if (!k) return;
     const t = this.team, s = this.state, m = this.memberOf(b);
     sfx.click();

@@ -365,3 +365,5 @@ body.team-open #passes, body.team-open #legend { display: none; }
 .bl .good { color: var(--mint); } .bl .bad { color: var(--coral); }
 @media (max-width: 760px) { .bl-conn, .bl-accts { grid-template-columns: 1fr; } }
 .bl { background: #0b1626; } .bl .pcard select { width: 100%; max-width: 100%; box-sizing: border-box; } .bl .zone { min-width: 0; } .bl .bl-who select { width: auto; }
+
+#team .tm[role=button] { cursor: pointer; } #team .tm.sel { outline: 3px solid #fff; background: #1b3558; }

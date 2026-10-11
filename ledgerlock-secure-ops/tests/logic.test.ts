@@ -1207,3 +1207,22 @@ describe('Blue Lantern campaign placement', () => {
     for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(true);
   });
 });
+
+describe('giving orders to a selected teammate', () => {
+  it('selects a teammate, sends them across the floor, and refuses orders when the team is off', () => {
+    const m = MISSIONS.find((x) => x.id === 'duplicate-ghost')!;
+    const { s, team } = teamRun(m, { team: true, autoDecide: true, auto: 'none', limit: 1 });
+    team.setAuto('priya', false);
+    team.select('priya'); expect(team.selected).toBe('priya');
+    team.select('you'); expect(team.selected).toBeNull();           // you cannot "order" yourself
+    team.select('marcus'); expect(team.selected).toBe('marcus');
+    const mem = team.member('marcus')!;
+    const walk = walkableFor(s.passes), a = ROOM_BY_ID.secure_ops;
+    const goal = nearestWalkable(walk, a.x0 + a.w - 3, a.y0 + a.h - 3, 5)!;
+    expect(team.goTo('marcus', goal)).toBeNull();
+    for (let i = 0; i < 400 && mem.phase === 'walking'; i++) team.update(0.25);
+    expect(mem.phase).toBe('idle'); expect(Math.floor(mem.pos.x)).toBe(goal.x); expect(Math.floor(mem.pos.y)).toBe(goal.y);
+    expect(team.goTo('marcus', { x: 0, y: 0 })).toMatch(/cannot get there/);
+    team.setCrew(false); expect(team.goTo('marcus', goal)).toMatch(/Only teammates/); team.select('marcus'); expect(team.selected).toBeNull();
+  });
+});

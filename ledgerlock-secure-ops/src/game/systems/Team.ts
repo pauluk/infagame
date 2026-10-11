@@ -4,7 +4,7 @@ import { TOOL_BY_ID } from '../../data/tools';
 import type { Cell, DialogSpec, ToolId } from '../types';
 import type { GameState } from './GameState';
 import type { MissionRunner } from './MissionRunner';
-import { walkableFor } from './Grid';
+import { findPath, walkableFor } from './Grid';
 import { ROLE_LABEL, performAction, playbookFor, type PlayAction, type Role } from './Playbook';
 import { reachRange, standFor } from './Reach';
 
@@ -85,6 +85,8 @@ export class TeamController {
   private lastReport = 0;
   /** Manager mode: are the teammates on duty? (They can be called in or sent home at any time.) */
   crewOn = false;
+  /** The teammate the manager has selected to give orders to (click them on the map or in the Team panel). */
+  selected: string | null = null;
 
   constructor(public s: GameState, public runner: MissionRunner, public opts: TeamOptions) {
     this.actions = playbookFor(s.mission);
@@ -153,6 +155,21 @@ export class TeamController {
     this.s.stats.orders++; this.s.log(`${this.s.fmtClock()} ${m.name} ordered: ${a.label} (about ${effortCost(a, m)} effort).`, 'info');
     this.s.changed();
     return null;
+  }
+  select(id: string | null): void {
+    const m = id ? this.member(id) : null;
+    this.selected = m && m.id !== 'you' && this.crewOn ? m.id : null; this.s.changed();
+  }
+  /** Order a teammate to walk to a spot on the floor. */
+  goTo(id: string, cell: Cell): string | null {
+    const m = this.member(id); if (!m || m.id === 'you' || !this.crewOn) return 'Only teammates take orders.';
+    if (fatigueOf(m.focus) === 'exhausted') return `${m.name} is exhausted (Focus ${Math.round(m.focus)}%). Give them a break first.`;
+    const path = findPath(walkableFor(this.s.passes), this.cellOf(m), cell);
+    if (!path) return `${m.name} cannot get there (a locked door or a missing pass).`;
+    this.release(m); m.resting = false;
+    m.task = { id: 'go:' + ++this.manualSeq, label: 'Walk there', role: 'investigator', kind: 'use', tool: 'e', after: [], done: () => false, ready: () => true };
+    m.manual = true; m.path = path; m.phase = 'walking'; m.note = 'Heading where you sent them'; m.walkIssued = false;
+    this.s.stats.orders++; this.s.changed(); return null;
   }
   recall(id: string): void {
     const m = this.member(id); if (!m) return;
@@ -363,7 +380,8 @@ export class TeamController {
   private cellOf(m: Member): Cell { return m.external ? m.external.cell() : { x: Math.floor(m.pos.x), y: Math.floor(m.pos.y) }; }
 
   private walk(m: Member, dt: number): void {
-    const a = m.task!, target = a.target!;
+    const a = m.task!, target = a.target ?? '';
+    if (a.id.startsWith('go:') && !m.path.length) return this.arrive(m);
     if (m.external) {
       if (!m.walkIssued) { const st = standFor(target, this.cellOf(m), this.s.passes); if (!st) return this.block(m, a, 'no route'); m.external.walkTo(st.goal); m.walkIssued = true; return; }
       if (!m.external.idle()) return;
@@ -373,7 +391,7 @@ export class TeamController {
     let budget = WALK_SPEED * dt;
     while (budget > 0 && m.path.length) {
       const nx = m.path[0];
-      if (!walk(nx.x, nx.y)) { m.path = []; const st = standFor(target, this.cellOf(m), this.s.passes); if (!st) return this.block(m, a, 'the door closed behind them'); m.path = st.path; continue; }
+      if (!walk(nx.x, nx.y)) { m.path = []; if (!target) return this.stop(m, 'Blocked on the way'); const st = standFor(target, this.cellOf(m), this.s.passes); if (!st) return this.block(m, a, 'the door closed behind them'); m.path = st.path; continue; }
       const tx = nx.x + 0.5, ty = nx.y + 0.5, dx = tx - m.pos.x, dy = ty - m.pos.y, d = Math.hypot(dx, dy);
       if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01) m.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'se' : 'nw') : (dy > 0 ? 'sw' : 'ne');
       if (d <= budget) { m.pos = { x: tx, y: ty }; m.path.shift(); budget -= d; this.enter(m); }
@@ -388,6 +406,7 @@ export class TeamController {
   }
   private arrive(m: Member): void {
     const a = m.task!;
+    if (a.id.startsWith('go:')) return this.stop(m, 'Standing by');
     if (a.target && !reachRange(a.target, m.pos.x, m.pos.y).ok) return this.block(m, a, 'could not get close enough');
     m.phase = 'working'; m.note = `${this.verb(a)}…`;
     const quick = m.role === 'any' || m.manual || a.role === m.role;

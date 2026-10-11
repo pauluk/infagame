@@ -340,7 +340,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       const s = this.S(m.pos.x, m.pos.y);
       sp.img.setPosition(s.x, s.y).setDepth(depthOf(m.pos.x, m.pos.y, 3));
       sp.tag.setPosition(s.x, s.y - 74).setDepth(depthOf(m.pos.x, m.pos.y, 4)).setText(m.name + (m.pending && !m.pending.resolved ? ' ?' : m.phase === 'blocked' ? ' !' : m.auto ? ' ⟳' : ''));
-      sp.ring.clear().lineStyle(2, m.color, 0.9).strokeEllipse(s.x, s.y + 2, 30, 14).setDepth(depthOf(m.pos.x, m.pos.y, 1));
+      sp.ring.clear().lineStyle(this.team.selected === m.id ? 4 : 2, this.team.selected === m.id ? 0xffffff : m.color, 0.95).strokeEllipse(s.x, s.y + 2, this.team.selected === m.id ? 38 : 30, this.team.selected === m.id ? 18 : 14).setDepth(depthOf(m.pos.x, m.pos.y, 1));
     }
   }
 
@@ -372,7 +372,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
       if (this.dragging) { const z = this.cameras.main.zoom; this.cameras.main.setScroll(down.cx - dx / z, down.cy - dy / z); }
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if (p.button === 0 && down && !this.dragging && !this.state.paused) this.handleClick(p.worldX, p.worldY);
+      if (p.button === 0 && down && !this.dragging && !this.state.paused) this.handleClick(p.worldX, p.worldY, !!(p.event as MouseEvent | undefined)?.shiftKey);
       down = null; this.dragging = false;
     });
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => this.zoomBy(dy > 0 ? -0.1 : 0.1));
@@ -499,7 +499,17 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.walkTo({ x: Math.floor(g.gx), y: Math.floor(g.gy) });
   }
 
-  private handleClick(wx: number, wy: number): void {
+  /** The teammate under a click on the map, if any. */
+  private crewAt(wx: number, wy: number): string | null {
+    if (!this.team.crewOn) return null;
+    let best: { id: string; d: number } | null = null;
+    for (const m of this.team.crew) { const s = this.S(m.pos.x, m.pos.y), d = Math.hypot(wx - s.x, wy - (s.y - 28)); if (d <= 26 && (!best || d < best.d)) best = { id: m.id, d }; }
+    return best ? (best as { id: string }).id : null;
+  }
+  private handleClick(wx: number, wy: number, shift = false): void {
+    const t = this.team, who = this.crewAt(wx, wy);
+    if (who) { t.select(t.selected === who ? null : who); const m = t.member(who)!; app.ui?.toast(t.selected ? `<b>${m.name}</b> selected. Click the map to send them somewhere, or click a component to give them a job (hold Shift to use it without a tool). Click them again to deselect.` : `${m.name} deselected.`, 'info'); sfx.click(); return; }
+    const sel = t.selected && t.crewOn ? t.member(t.selected) ?? null : null;
     // props, readers, externals first; then routes; then the floor (select room + walk)
     let best: { id: string; d: number } | null = null;
     const consider = (id: string, x: number, y: number, r: number) => { const d = Math.hypot(wx - x, wy - y); if (d <= r && (!best || d < best.d)) best = { id, d }; };
@@ -509,8 +519,17 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     }
     for (const e of EXTERNALS) { const s = this.S(e.x + 1.5, e.y + 1.5); consider('ext:' + e.id, s.x, s.y - 20, 44); }
     if (!best && this.flow.visible) { const h = this.flow.hit(wx, wy); if (h && h.d <= 10) best = { id: 'route:' + h.id, d: h.d }; }
+    if (best && sel) {
+      const id = (best as { id: string }).id; this.selectTarget(id);
+      const err = t.order(sel.id, { tool: shift ? 'e' : this.state.selectedTool, target: id });
+      app.ui?.toast(err ? err : `<b>${sel.name}</b> is on it.`, err ? 'warn' : 'good'); sfx.click(); return;
+    }
     if (best) { this.selectTarget((best as { id: string }).id); sfx.click(); return; }
     const g = toGrid(wx, wy), cx = Math.floor(g.gx), cy = Math.floor(g.gy);
+    if (sel && GRID.kind[cy]?.[cx] && GRID.kind[cy][cx] !== 'void') {
+      const err = t.goTo(sel.id, { x: cx, y: cy });
+      app.ui?.toast(err ? err : `<b>${sel.name}</b> is heading there.`, err ? 'warn' : 'good'); sfx.click(); return;
+    }
     const room = roomAt(cx, cy);
     if (room) this.selectTarget('room:' + room.id); else this.selectTarget(null);
     if (GRID.kind[cy]?.[cx] && GRID.kind[cy][cx] !== 'void') { this.takeOver(); this.walkTo({ x: cx, y: cy }); }
