@@ -9,3 +9,10 @@ You manage the team by **asking**, **ordering** and **deciding**; the resource a
 * **Debrief** shows team effort, breaks, orders, Auto actions and JEV use. Stretch goals are not counted if Auto did any work.
 
 Code: `src/game/systems/Team.ts` (`effortCost`, `fatigueOf`, `quote`, `question`, `rest`), `src/ui/teamPanel.ts`. Tests: the *manager mode* describe block in `tests/logic.test.ts` and `tests/e2e-team.mjs`.
+
+## Auto keeps going
+
+* **Auto makes the calls by default.** A member on Auto answers choices and confirmations with the best-practice option (untick *Auto makes the calls* in Settings or the Team panel to be asked instead).
+* **Popups are closed for you.** While Auto is on and you have not touched the mouse or keyboard for a moment, informational popups (alerts, goals, results) close after a second or so, and choices and confirmations are answered. A toast says what was done. Anything you click yourself is never overridden.
+* **Auto-run** (Settings, *Auto keeps going*; switched on automatically the first time you use Auto): Auto stays on from one mission to the next. The briefing continues after 5 seconds and the debrief moves to the next mission after 10, with a visible countdown. Any click or key press cancels it, and taking over your avatar switches your own Auto off.
+* **Watchdog.** If nothing has advanced for 40 game seconds, everyone forgets old failures and tries again (the log says so).

@@ -58,6 +58,8 @@ Pick **Tutorial Mode** on the title screen (or tick it in the briefing, Settings
 - Fairness: stretch goals are earned by hand, so they are not counted for any run in which Auto did an action (shown in the debrief). Everything else is scored normally.
 - Keyboard: **T** shows or hides the panel.
 
+- **Auto keeps going.** Auto decides by default, closes acknowledgement popups for you, and (Auto-run) carries on from mission to mission with a visible countdown that any click cancels. See `docs/manager-mode.md`.
+
 ### JEV second opinions (optional)
 Turn on **JEV** in Settings (it needs `TYPESAFE_API_KEY` on the server) to ask TypeSafe AI's JEV model for a second opinion on a decision; teammates on Auto consult it too and only act alone when it is confident. See `docs/jev.md`.
 
@@ -70,6 +72,9 @@ Turn on **JEV** in Settings (it needs `TYPESAFE_API_KEY` on the server) to ask T
 * Five campaign measures (transaction integrity, service availability, data protection, recovery readiness, audit quality) combine into **Service Confidence**, shown on the Control Room wall and in every debrief. Six badges reward good habits (Precision Over Panic, Least Privilege, No Lost Events, Ledger Listener, Clean Restore, Good Evidence).
 * Debriefs show objective status, evidence and its sources, Service Confidence before/after, routes affected and the safest next step. Completed missions can be replayed. Progress lives only in your browser's local storage.
 * The tutorial has a bespoke simulation; missions 2-8 run on the declarative scenario engine (`src/data/missions/scenario.ts`). Add a mission by writing a `MissionDef` / `ScenarioSpec` and listing it in `src/data/missions/index.ts`. Game state (`GameState`) and rules (`MissionRunner`) contain no Phaser/DOM code.
+
+### Business-continuity missions
+Missions 9 to 11 (open after the tutorial): **Payments Down** (a payment run cannot reach the bank before payroll), **Rising Water** (a flood in the Event Stream Hall: safety first, fail over, rebuild, fail back) and **Flood Gates** (a flood of requests at the API Gateway). See `docs/bcp-missions.md`.
 
 ## Facility map
 
