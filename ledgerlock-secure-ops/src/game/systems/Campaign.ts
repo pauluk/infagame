@@ -49,14 +49,8 @@ export class Campaign {
 
   isCompleted(id: string) { return !!this.data.missions[id]?.completed; }
   /** Campaign missions unlock in order; the side-task hub unlocks with the tutorial. */
-  isUnlocked(m: MissionDef, all: MissionDef[]): boolean {
-    if (this.data.unlockedAll) return true;
-    if (m.order === 0) return this.isCompleted('duplicate-ghost');
-    if (m.order <= 1) return true;
-    if (m.order === BCP_FIRST || m.order === CYBER_FIRST || m.order === BLUE_FIRST || m.order === BLUE_FIRST + 1) return this.isCompleted('duplicate-ghost');      // the business-continuity track opens after the tutorial
-    const prev = all.find((x) => x.order === m.order - 1);
-    return !prev || this.isCompleted(prev.id);
-  }
+  /** Every mission is open from the start and can be played in any order. */
+  isUnlocked(_m: MissionDef, _all: MissionDef[]): boolean { return true; }
   unlockAll() { this.data.unlockedAll = true; this.save(); }
   overall(): number { return overallConfidence(this.data.measures); }
   priorEvidence(excludeId: string): string[] {

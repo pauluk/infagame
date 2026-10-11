@@ -300,11 +300,11 @@ describe('Service Confidence and campaign storage', () => {
     expect(oc(good)).toBeGreaterThan(oc(shut)); expect(oc(good)).toBeGreaterThan(oc(rush));
     expect(measuresOf(shut).integrity).toBe(100); expect(measuresOf(rush).availability).toBe(100);   // one strong measure is not enough
   });
-  it('persists progress locally, unlocks missions in order, supports replay and reset', () => {
+  it('persists progress locally, keeps every mission open, supports replay and reset', () => {
     const mem = new Map<string, string>(); const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) };
     const c = new Campaign(store);
     const [m1, m2, m3, m4] = MISSIONS;
-    expect(c.isUnlocked(m1, MISSIONS)).toBe(true); expect(c.isUnlocked(m2, MISSIONS)).toBe(false);
+    expect(c.isUnlocked(m1, MISSIONS)).toBe(true); expect(c.isUnlocked(m2, MISSIONS)).toBe(true);
     const { s } = runScript(m2 as ScenarioMission);   // play m2 directly to produce a result (unlock gating is a UI/campaign rule)
     const out = c.recordResult(s);
     expect(out.after.integrity).not.toBe(out.before.integrity + 999);
@@ -313,7 +313,7 @@ describe('Service Confidence and campaign storage', () => {
     expect(c.data.missions[m2.id].plays).toBe(2);
     expect(JSON.parse(mem.get('ledgerlock.campaign.v1')!).missions[m2.id].completed).toBe(true);
     const c2 = new Campaign(store); expect(c2.isCompleted(m2.id)).toBe(true);
-    expect(c2.isUnlocked(m1, MISSIONS)).toBe(true); expect(c2.isUnlocked(m3, MISSIONS)).toBe(true); expect(c2.isUnlocked(m4, MISSIONS)).toBe(false);
+    expect(c2.isUnlocked(m1, MISSIONS)).toBe(true); expect(c2.isUnlocked(m3, MISSIONS)).toBe(true); expect(c2.isUnlocked(m4, MISSIONS)).toBe(true);
     c2.reset(); expect(c2.isCompleted(m2.id)).toBe(false);
     expect(JSON.stringify([...mem.values()])).not.toMatch(/password|secret|token_value/i);
   });
@@ -1053,11 +1053,11 @@ describe('business-continuity missions', () => {
       expect(m.evidence.length, m.id).toBeGreaterThanOrEqual(3);
     }
   });
-  it('the track opens after the tutorial, then in order', () => {
+  it('every mission in the track is open from the start', () => {
     const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
-    const [a, b] = bcp; expect(c.isUnlocked(a, MISSIONS)).toBe(false);
+    const [a, b] = bcp; expect(c.isUnlocked(a, MISSIONS)).toBe(true);
     const tut = MISSIONS.find((m) => m.id === 'duplicate-ghost')!; const st0 = new GameState(tut); c.recordResult(Object.assign(st0, { complete: true }));
-    expect(c.isUnlocked(a, MISSIONS)).toBe(true); expect(c.isUnlocked(b, MISSIONS)).toBe(false);
+    expect(c.isUnlocked(a, MISSIONS)).toBe(true); expect(c.isUnlocked(b, MISSIONS)).toBe(true);
   });
   it('wrong continuity calls are explained and do not complete the step', () => {
     for (const [id, step, bad] of [['payments-down', 'strategy', 'wait'], ['payments-down', 'comms', 'fine'], ['rising-water', 'safety', 'rescue'], ['flood-gates', 'strategy', 'blockall']] as const) {
@@ -1198,11 +1198,11 @@ describe('Blue Lantern: emergency payment continuity', () => {
 });
 
 describe('Blue Lantern campaign placement', () => {
-  it('both Blue Lantern missions open once the tutorial is done, and not before', () => {
+  it('both Blue Lantern missions are open from the start', () => {
     const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
     const bl = MISSIONS.filter((m) => m.id.startsWith('blue-lantern'));
     expect(bl).toHaveLength(2);
-    for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(false);
+    for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(true);
     (c.data.missions as any)['duplicate-ghost'] = { completed: true };
     for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(true);
   });
