@@ -133,9 +133,10 @@ The Fabric room and analytics panel (**F**) show synthetic Bronze/Silver/Gold st
 
 ## Verification status
 
-What was actually run in this repository (2026-10-10, Linux, Node 22, Blender 4.5.9 LTS headless):
+What was actually run in this repository (updated 2026-10-11, Linux, Node 22, Blender 4.5.9 LTS headless):
 
 * Assets were downloaded from the official Quaternius (via its itch.io free-download flow), Kenney and Poly Haven pages and licences checked; **191 sprites were rendered with Blender Cycles** and packed into 5 atlases.
-* `npm run build`, `npm run typecheck` and `npm run test` (21 tests) pass.
+* `npm run build`, `npm run typecheck` and `npm run test` (172 tests) pass.
+* Headless-browser runs pass for the map (`tests/e2e-blueprint.mjs`: 16 rooms, 42 corridors, 9 concourses), the campaign screens (`tests/e2e-campaign.mjs`: 17 missions) and Blue Lantern worked by hand through every stage of the real board (`tests/e2e-bluelantern.mjs`).
 * `tests/e2e.mjs` plays the tutorial from the title screen to the debrief in headless Chromium (software WebGL) and asserts the console is clean.
 * Not tested: real GPU rendering, Safari/Firefox, physical touch devices (touch controls were built but only exercised through emulation of pointer events), and the live Fabric adapter (no tenant or credentials were available; it is untested by design).

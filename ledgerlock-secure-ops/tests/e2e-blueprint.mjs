@@ -31,14 +31,14 @@ if (!(await S('(sc)=>sc.state.paused'))) await fail('opening the map should paus
 const tabs = await page.$$eval('#blueprint .bp-tabs button', (e) => e.map((x) => x.textContent));
 if (tabs.slice(0, 4).join() !== 'Facility,Systems,Access,Incident') await fail('the four map views: ' + tabs);
 const rooms = await page.$$eval('#blueprint svg g.bp-room', (e) => e.map((x) => ({ id: x.dataset.room, unknown: x.classList.contains('unknown'), code: x.querySelector('text')?.textContent })));
-if (rooms.length !== 15) await fail('15 rooms on the map, got ' + rooms.length);
+if (rooms.length !== 16) await fail('16 rooms on the map, got ' + rooms.length);
 const known = rooms.filter((r) => !r.unknown).map((r) => r.code).sort().join();
 if (known !== 'A3,B3') await fail('only the atrium and the incident room are revealed at the start: ' + known);
 if (rooms.filter((r) => r.unknown).some((r) => r.code === '?' === false)) await fail('unexplored rooms must be silhouettes with no name');
 const nCorr = await page.$$eval('#blueprint [data-corr]', (e) => e.length), nJ = await page.$$eval('#blueprint .bp-junction', (e) => e.length), nDoor = await page.$$eval('#blueprint [data-door]', (e) => e.length);
-if (nCorr !== 39 || nJ !== 8) await fail(`graph on the map: ${nCorr} corridors / ${nJ} junctions`);
+if (nCorr !== 42 || nJ !== 9) await fail(`graph on the map: ${nCorr} corridors / ${nJ} junctions`);
 if (nDoor < 10) await fail('door markers: ' + nDoor);
-ok(`facility view: 15 rooms (2 revealed, 13 silhouettes), ${nCorr} explicit corridors, ${nJ} concourses, ${nDoor} door markers (undiscovered rooms hide their names)`);
+ok(`facility view: 16 rooms (2 revealed, 14 silhouettes), ${nCorr} explicit corridors, ${nJ} concourses, ${nDoor} door markers (undiscovered rooms hide their names)`);
 if ((await page.$$eval('#blueprint svg line[stroke*="#"]', (l) => l.length)) > 400) await fail('the facility view should not draw data routes');
 await shot('bp-1-iso');
 await page.click('[data-a=mode-top]'); await page.waitForTimeout(200);
