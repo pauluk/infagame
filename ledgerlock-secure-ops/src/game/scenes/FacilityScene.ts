@@ -14,7 +14,7 @@ import { sfx } from '../systems/Sfx';
 import { ENTRANCE, EXTERNALS, GRID, ROOMS, ROOM_BY_ID, WORLD_H, WORLD_W, doorInfo, roomAt } from '../../data/map';
 import { isKnown } from '../systems/Fog';
 import { PASSES } from '../../data/passes';
-import { ROUTE_BY_ID, pointAt, routePoints, routeRooms } from '../../data/routes';
+import { ROUTES, ROUTE_BY_ID, pointAt, routePoints, routeRooms } from '../../data/routes';
 import { TOOL_BY_ID } from '../../data/tools';
 import { describeTarget } from '../../data/targets';
 import type { MissionDef } from '../../data/missions/types';
@@ -61,6 +61,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   private roomObjs = new Map<RoomId, { floors: { img: Phaser.GameObjects.Image; tint: number | null }[]; walls: Phaser.GameObjects.Image[]; props: Phaser.GameObjects.Image[] }>();
   private fogSig = '';
   private water!: Phaser.GameObjects.Graphics;
+  private fogG!: Phaser.GameObjects.Graphics;
   private waterLabels = new Map<RoomId, Phaser.GameObjects.Text>();
   private objsOf(id: RoomId) { let o = this.roomObjs.get(id); if (!o) { o = { floors: [], walls: [], props: [] }; this.roomObjs.set(id, o); } return o; }
   private walls: { img: Phaser.GameObjects.Image; gx: number; gy: number }[] = [];
@@ -104,6 +105,7 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     this.guide = this.add.graphics().setDepth(19000);
     this.highlight = this.add.graphics().setDepth(19500);
     this.water = this.add.graphics().setDepth(9000);
+    this.fogG = this.add.graphics().setDepth(-9000);
     this.coach = this.add.graphics().setDepth(21800);
     this.buildPlayer();
     this.buildTeam();
@@ -220,10 +222,17 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
     for (const r of ROOMS) {
       const known = isKnown(this.state, r.id), o = this.roomObjs.get(r.id); if (!o) continue;
       for (const f of o.floors) { if (known) { f.tint === null ? f.img.clearTint() : f.img.setTint(f.tint); f.img.setAlpha(1); } else f.img.setTint(0x16243b).setAlpha(0.95); }
-      for (const w of o.walls) { if (known) w.clearTint(); else w.setTint(0x22344f); }
+      for (const w of o.walls) w.setVisible(known);                // an undiscovered room is a flat dark footprint, not a block of tall walls
       for (const p of o.props) p.setVisible(known);
       this.roomLabels.get(r.id)?.setVisible(known);
       for (const p of r.props) { const t = this.statusLabels.get(p.id); if (t && !known) t.setVisible(false); }
+    }
+    // data routes only show once every room they pass through is discovered
+    this.flow.hidden = new Set(ROUTES.filter((q) => routeRooms(q).some((id) => !isKnown(this.state, id))).map((q) => q.id));
+    this.fogG.clear();
+    for (const r of ROOMS) if (!isKnown(this.state, r.id)) {
+      const pts = [[r.x0, r.y0], [r.x0 + r.w, r.y0], [r.x0 + r.w, r.y0 + r.h], [r.x0, r.y0 + r.h]].map(([x, y]) => this.S(x, y));
+      this.fogG.fillStyle(0x0f1b2e, 1).fillPoints(pts.map((q) => new Phaser.Geom.Point(q.x, q.y)), true).lineStyle(2, 0x34517f, 0.9).strokePoints(pts.map((q) => new Phaser.Geom.Point(q.x, q.y)), true);
     }
   }
   private roomLabelText(r: RoomDef, open: boolean): string {

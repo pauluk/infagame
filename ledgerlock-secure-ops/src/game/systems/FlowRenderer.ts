@@ -14,6 +14,8 @@ export class FlowRenderer {
   private g: Phaser.GameObjects.Graphics;
   visible = true;
   labelsVisible = true;
+  /** Routes through rooms the player has not discovered yet stay hidden (until selected or in trouble). */
+  hidden = new Set<string>();
 
   constructor(private scene: Phaser.Scene) {
     this.g = scene.add.graphics().setDepth(20000);
@@ -59,6 +61,7 @@ export class FlowRenderer {
     for (const r of this.geo) {
       const st = states[r.def.id] ?? 'healthy';
       const sel = selected === 'route:' + r.def.id;
+      if (this.hidden.has(r.def.id) && !sel && (st === 'healthy' || st === 'restored')) continue;
       const col = st === 'quarantined' ? C.coral : st === 'suspicious' ? C.amber : st === 'restored' ? C.mint : C[r.def.color];
       const dim = st === 'quarantined' ? 0.75 : st === 'delayed' ? 0.55 : 0.9;
       const w = sel ? 5 : 3;
@@ -108,7 +111,8 @@ export class FlowRenderer {
       const txt = `${L.icon} ${r.def.name} → ${L.label}`;
       if (r.label.text !== txt) r.label.setText(txt);
       r.label.setColor(st === 'quarantined' ? PALETTE.coral : st === 'suspicious' ? PALETTE.amber : PALETTE.white);
-      r.label.setVisible(this.visible && (this.labelsVisible || selected === 'route:' + r.def.id));
+      const hide = this.hidden.has(r.def.id) && selected !== 'route:' + r.def.id && (st === 'healthy' || st === 'restored');
+      r.label.setVisible(this.visible && !hide && (this.labelsVisible || selected === 'route:' + r.def.id));
     }
   }
 
