@@ -92,7 +92,7 @@ export const EXTERNALS: ExternalDef[] = [
 export const EXTERNAL_BY_ID = Object.fromEntries(EXTERNALS.map((e) => [e.id, e]));
 
 /** Facility entrance gate: decorative, on open ground outside the atrium's south-east corner (checked by the layout tests). */
-export const ENTRANCE = { x: 45, y: 36, w: 3 };
+export const ENTRANCE = { x: 59, y: 36, w: 3 };
 
 // ---- walk grid ----
 export interface MapGrid {

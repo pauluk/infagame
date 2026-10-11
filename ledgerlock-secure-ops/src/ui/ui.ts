@@ -168,6 +168,7 @@ export class UI {
       <div class="row"><button class="primary" data-a="ok">Got it</button></div></div>`);
     s.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('button')) { sfx.click(); try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ } next(); } });
     ($(s, 'button.primary') as HTMLElement).focus();
+    if (this.state) this.autoAdvance(s, 'button[data-a="ok"]', 4, 'the briefing');
   }
 
   showSettings(focus: 'audio' | 'access' | 'all', back: () => void): void {
@@ -552,8 +553,14 @@ export class UI {
     const { sc, ox, oy } = this.mmGeom();
     const px = ((e.clientX - r.left) / r.width) * 520, py = ((e.clientY - r.top) / r.height) * 400;
     const gx = (px - ox) / sc, gy = (py - oy) / sc;
+    const sc2 = this.scene!;
+    // a teammate: look at them
+    const mate = sc2.team.crewOn ? sc2.team.crew.find((m) => Math.hypot((m.pos.x * sc + ox - px), (m.pos.y * sc + oy - py)) < 12) : undefined;
+    if (mate) { sfx.click(); sc2.focusMember(mate.id); this.toast(`Showing <b>${esc(mate.name)}</b>: ${esc(mate.note)}`, 'info'); return; }
     const room = ROOMS.find((q) => gx >= q.x0 && gx < q.x0 + q.w && gy >= q.y0 && gy < q.y0 + q.h);
-    if (room) { sfx.click(); this.scene!.selectTarget('room:' + room.id); this.guide(room.id); }
+    sfx.click();
+    if (room) { sc2.selectTarget('room:' + room.id); this.mmSelected = room.id; const r = sc2.setWaypoint('room:' + room.id); if (!r.ok) this.toast(esc(r.note), 'warn'); else this.toast(esc(r.note), 'info'); return; }
+    if (GRID.kind[Math.floor(gy)]?.[Math.floor(gx)] === 'corridor') { sc2.walkTo({ x: Math.floor(gx), y: Math.floor(gy) }); this.toast('Walking there.', 'info'); }
   }
 
   private renderMinimap(): void {
@@ -597,11 +604,18 @@ export class UI {
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.setLineDash([2, 4]); ctx.beginPath();
       this.guidePath.forEach((p, i) => (i ? ctx.lineTo(p.x * sc + ox, p.y * sc + oy) : ctx.moveTo(p.x * sc + ox, p.y * sc + oy))); ctx.stroke(); ctx.setLineDash([]);
     }
+    // teammates (Manager mode): coloured dots with their initial
+    if (this.scene?.team.crewOn) for (const m of this.scene.team.crew) {
+      const mx = m.pos.x * sc + ox, my = m.pos.y * sc + oy, hex = '#' + m.color.toString(16).padStart(6, '0');
+      ctx.fillStyle = hex; ctx.beginPath(); ctx.arc(mx, my, 7, 0, 6.3); ctx.fill(); ctx.strokeStyle = '#0B1424'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#0B1424'; ctx.font = 'bold 9px system-ui'; ctx.fillText(m.name[0], mx, my + 0.5);
+      if (m.phase === 'blocked' || (m.pending && !m.pending.resolved)) { ctx.fillStyle = PALETTE.amber; ctx.font = 'bold 12px system-ui'; ctx.fillText('!', mx + 9, my - 8); }
+    }
     // player
     const px = st.player.x * sc + ox, py = st.player.y * sc + oy;
     ctx.fillStyle = PALETTE.cyan; ctx.beginPath(); ctx.arc(px, py, 8, 0, 6.3); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
     ctx.fillStyle = PALETTE.white; ctx.font = 'bold 11px system-ui'; ctx.fillText('YOU', px, py - 15); ctx.font = 'bold 15px system-ui';
-    cv.title = 'Click a room to show its corridor route (no teleport)';
+    cv.title = 'Click a room or corridor to walk there (never a teleport). Click a teammate to look at them.';
   }
 
   private renderPasses(): void {
@@ -763,7 +777,7 @@ export class UI {
   }
   /** With Auto-run on, move past a briefing or debrief screen by itself after a short pause (any input cancels it). */
   private autoAdvance(screen: HTMLElement, selector: string, seconds: number, what: string): void {
-    if (!settings.data.autoRun) return;
+    if (!settings.data.autoRun || performance.now() - this.lastInput < 1500) return;      // a screen the person just asked for stays put
     const btn = screen.querySelector(selector) as HTMLElement | null; if (!btn) return;
     const note = el('div', { class: 'small', role: 'status' }, ''); note.style.marginTop = '8px'; (screen.querySelector('.card') ?? screen).appendChild(note);
     const seen = this.lastInput; let left = seconds;

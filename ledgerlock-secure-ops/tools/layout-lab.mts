@@ -6,11 +6,11 @@
 import { writeFileSync } from 'node:fs';
 import { SPECS } from '../src/data/rooms';
 
-const W = 78, H = 57, DY = 3;
+const W = 92, H = 57, DY = 3, DX = 14;   // DX shifts the original layout east to make room for the Expense Claims wing on the west
 type Side = 'n' | 's' | 'e' | 'w';
 interface R { id: string; x: number; y: number; w: number; h: number; ox: number; oy: number }
 const R: Record<string, R> = {};
-const room = (id: string, x: number, y: number, w: number, h: number) => { R[id] = { id, x, y: y + DY, w, h, ox: Math.max(0, Math.floor((w - 10) / 2)), oy: Math.max(0, Math.floor((h - 8) / 2)) }; };
+const room = (id: string, x: number, y: number, w: number, h: number) => { R[id] = { id, x: x + DX, y: y + DY, w, h, ox: Math.max(0, Math.floor((w - 10) / 2)), oy: Math.max(0, Math.floor((h - 8) / 2)) }; };
 room('audit_gallery', 2, 4, 6, 9);
 room('event_stream', 11, 2, 12, 9);
 room('fabric_platform', 27, 2, 12, 9);
@@ -25,6 +25,7 @@ room('payroll_pensions', 22, 36, 8, 7);
 room('card_payments', 34, 40, 12, 8);
 room('bacs_vault', 49, 40, 10, 8);
 room('debt_recovery', 63, 40, 10, 8);
+R.expense_claims = { id: 'expense_claims', x: 2, y: 23, w: 10, h: 8, ox: 0, oy: 0 };
 R.audit_gallery.ox = 0; R.audit_gallery.oy = 0; R.payroll_pensions.ox = 0; R.payroll_pensions.oy = 0;
 
 type LinkKind = 'main' | 'maintenance';
@@ -32,7 +33,7 @@ interface Lk { id: string; a: string; sa?: Side; b: string; sb?: Side; kind: Lin
 interface Jn { id: string; x: number; y: number; w: number; h: number; name: string }
 /** Corridor junctions (concourses): explicit graph nodes where corridors meet, so a locked room never sits on the only way somewhere. */
 const J: Record<string, Jn> = {};
-const junction = (id: string, name: string, x: number, y: number) => { J[id] = { id, name, x, y: y + 0, w: 4, h: 4 }; };
+const junction = (id: string, name: string, x: number, y: number) => { J[id] = { id, name, x: x + DX, y: y + 0, w: 4, h: 4 }; };
 junction('jn', 'North Concourse', 33, 17);
 junction('jnw', 'North-West Concourse', 13, 15);
 junction('jw', 'West Concourse', 25, 26);
@@ -59,6 +60,7 @@ const LINKS: Lk[] = [
   L('es-api', 'event_stream', 'n', 'api_gateway', 'n', 'Conduit shortcut (Event Stream to API Gateway)', 'maintenance'),
   L('es-audit', 'event_stream', 'w', 'audit_gallery', 'e', 'Gallery approach'), L('api-ix', 'api_gateway', 'e', 'integration_exchange', 'w', 'Gateway link'),
   L('ix-agency', 'integration_exchange', 's', 'agency_handoff', 'n', 'Courier lift (Integration Exchange to Agency Hand-off)', 'maintenance'),
+  L('jnw-exp', 'jnw', undefined, 'expense_claims', 'n', 'Claims branch'), L('exp-fc', 'expense_claims', 'e', 'finance_core', 'w', 'Claims to ledger'),
   L('fc-sp', 'finance_core', 's', 'service_payments', 'n', 'Service walk'), L('sp-pp', 'service_payments', 'e', 'payroll_pensions', 'w', 'Staff corridor'),
   L('sp-card', 'service_payments', 'e', 'card_payments', 'w', 'Back-office shortcut (Service Payments to Card Payments)', 'maintenance'),
   L('card-bacs', 'card_payments', 'e', 'bacs_vault', 'w', 'Rails corridor'), L('bacs-debt', 'bacs_vault', 'e', 'debt_recovery', 'w', 'Service tunnel'), L('agency-debt', 'agency_handoff', 's', 'debt_recovery', 'n', 'Recovery walk'),

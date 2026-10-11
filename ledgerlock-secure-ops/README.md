@@ -38,7 +38,7 @@ Requires Node 20+ (developed on Node 22). `npm run assets:render` additionally n
 | <kbd>E</kbd> | Use the selected tool on the nearest highlighted object (or on the selected target). Opens door readers, the Access Desk and the Evidence Board. |
 | <kbd>1</kbd>-<kbd>8</kbd> | Select tool: Scanner, Lens, Quarantine, Patch, Token Rotation, Clean Restore, Reconcile, Reroute |
 | Mouse click | Select/inspect an object, flow line, door reader or room. Click a minimap room for a corridor guide (no teleport). |
-| <kbd>M</kbd> / <kbd>F</kbd> / <kbd>L</kbd> / <kbd>R</kbd> | Minimap / Fabric panel / incident log / route overlay |
+| <kbd>M</kbd> / <kbd>F</kbd> / <kbd>L</kbd> / <kbd>R</kbd> | Minimap (click a room or corridor to walk there, click a teammate to look at them) / Fabric panel / incident log / route overlay |
 | <kbd>B</kbd> / <kbd>I</kbd> / <kbd>T</kbd> / <kbd>G</kbd> | Facility map and blueprint / Incident Board / Team panel / Goals |
 | Wheel, <kbd>+</kbd> <kbd>-</kbd>, drag, <kbd>C</kbd> | Zoom (0.55-3x), pan, return camera to player |
 | <kbd>Esc</kbd> | Pause (resume, restart mission, how to play, audio/accessibility, quit) |
@@ -78,13 +78,13 @@ Missions 9 to 11 (open after the tutorial): **Payments Down** (a payment run can
 
 ## Facility map
 
-An irregular layout of **14 rooms** of different sizes (the twelve core rooms plus an Audit Gallery and a Payroll & Pensions office) around a central **Secure Operations Atrium**, joined by short corridors and eight corridor concourses. It is an explicit graph with stable room ids: movement, the minimap, doors, readers, incident markers and the map views all read the same data (`src/data/layout.ts`; see `docs/map-and-access.md`).
+An irregular layout of **15 rooms** of different sizes (the twelve core rooms plus an Audit Gallery, a Payroll & Pensions office and an Expense Claims service room) around a central **Secure Operations Atrium**, joined by short corridors and eight corridor concourses. It is an explicit graph with stable room ids: movement, the minimap, doors, readers, incident markers and the map views all read the same data (`src/data/layout.ts`; see `docs/map-and-access.md`).
 
 | Wing | Rooms |
 |---|---|
 | Atrium | A3 Secure Operations Atrium: spawn, Incident Board, Facility Overview Terminal, Access Desk, Identity & Access Desk |
 | Data | A1 API Gateway, B1 Event Stream Hall, C1 Fabric Data Platform, E1 Audit Gallery (read-only) |
-| Finance operations | B2 Finance Core (Accounting and AP workstations), A2 Service Payments |
+| Finance operations | B2 Finance Core (Accounting and AP workstations), A2 Service Payments, E3 Expense Claims (claims go to the payroll system, then Payment Orchestration, the BACS Vault and the bank) |
 | Payment rails | C2 Payment Orchestration (Treasury workstations), B3 Card Payments, D2 BACS Vault, D1 Integration Exchange |
 | Collections and staff | C3 Accounts Receivable & Debt Recovery (AR workstations), D3 Agency Hand-off, E2 Payroll & Pensions Office (Fraud workstations in B3 and D3) |
 

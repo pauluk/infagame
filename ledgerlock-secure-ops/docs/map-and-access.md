@@ -13,7 +13,7 @@ The facility is an **explicit graph**. Rooms and corridor junctions are nodes, c
 
 ## Layout
 
-World 78 x 57 cells; projection `screenX = originX + (gx - gy) * 24`, `screenY = originY + (gx + gy) * 12` (`Grid.ts`). Fourteen rooms of **different sizes** (6 x 9 up to 14 x 12) sit in an irregular arrangement around the central **Secure Operations Atrium**, joined by short corridors (2 cells wide) and eight **concourses** (4 x 4 open plazas where corridors meet). The map only shows corridors that exist: there is no continuous floor around the rooms.
+World 92 x 57 cells; projection `screenX = originX + (gx - gy) * 24`, `screenY = originY + (gx + gy) * 12` (`Grid.ts`). Fifteen rooms of **different sizes** (6 x 9 up to 14 x 12) sit in an irregular arrangement around the central **Secure Operations Atrium**, joined by short corridors (2 cells wide) and eight **concourses** (4 x 4 open plazas where corridors meet). The map only shows corridors that exist: there is no continuous floor around the rooms.
 
 Wings (the twelve core rooms keep their ids and codes; workstations are small bays inside system rooms, not rooms):
 
@@ -21,7 +21,7 @@ Wings (the twelve core rooms keep their ids and codes; workstations are small ba
 |---|---|
 | Atrium | `secure_ops` A3 Secure Operations Atrium: spawn, Incident Wall (Incident Board), Facility Overview Terminal, Access Desk, **Identity & Access Desk**. Five exits. |
 | Data | `api_gateway` A1, `event_stream` B1, `fabric_platform` C1, `audit_gallery` E1 (read-only gallery) |
-| Finance operations | `finance_core` B2 (Accounting and AP workstations), `service_payments` A2 |
+| Finance operations | `finance_core` B2 (Accounting and AP workstations), `service_payments` A2, `expense_claims` E3 (the route `expense_payment`: Expense Claims, Payroll & Pensions, Payment Orchestration, BACS Vault, bank) |
 | Payment rails | `payment_orchestration` C2 (Treasury workstations), `card_payments` B3 (Fraud workstation), `bacs_vault` D2, `integration_exchange` D1 |
 | Collections and staff | `debt_recovery` C3 (AR workstations), `agency_handoff` D3 (Fraud workstation), `payroll_pensions` E2 (Payroll & Pensions office) |
 
@@ -61,6 +61,7 @@ Every room is restricted. A door cell is walkable only if the player holds that 
 | Room | Pass | Scope |
 |---|---|---|
 | secure_ops | ops_pass | Control Room and common corridors |
+| expense_claims | expense_audit_pass | Read-only, masked expense-claim metadata (optional) |
 | audit_gallery | audit_gallery_pass | Read-only access to the audit exhibits (optional) |
 | payroll_pensions | staff_office_pass | Escorted entry to the Payroll & Pensions office (optional) |
 | service_payments | service_audit_pass | Read-only, masked payment-request evidence |
@@ -86,3 +87,7 @@ Passes are fictional, mission-scoped and read-only; `GameState.passes` is create
 ## Minimap
 
 Rooms with codes, door states (circle open, square locked, diamond sealed, hollow square disabled), the player, undiscovered rooms as silhouettes, held passes (chips), the active incident route, and corridor guides. Clicking a room highlights the corridor path (and stops at the door if the room is locked) without teleporting. Camera follow, zoom limits and "Return to player" are in the HUD.
+
+## Teammates on the map
+
+In Manager mode the minimap and the Facility, Access and Incident map views show each teammate as a coloured dot with their initial (an amber ! when they are stuck or waiting for a decision). Click a room or a corridor on the minimap to walk there (never a teleport; locked rooms take you to their door), or click a teammate to put the camera on them.

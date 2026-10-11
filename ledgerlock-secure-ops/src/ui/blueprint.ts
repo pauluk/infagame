@@ -112,8 +112,11 @@ export class BlueprintView {
       <span class="grp"><button data-a="zoomin" aria-label="Zoom in">+</button><button data-a="zoomout" aria-label="Zoom out">−</button><button data-a="zoomreset">Fit</button><button data-a="centre">Centre on me</button></span></div>`;
   }
 
+  /** Teammates (Manager mode) to draw on the map. */
+  private crew() { const t = this.host.scene.team; return t.crewOn ? t.crew.map((m) => ({ id: m.id, name: m.name, colour: '#' + m.color.toString(16).padStart(6, '0'), x: m.pos.x, y: m.pos.y, note: m.note })) : []; }
+
   private overviewMain(layer: MapLayer): string {
-    const svg = overviewSvg(this.s, { mode: this.mode, layer, selRoom: this.selRoom, selDoor: this.selDoor, selCorridor: this.selCorr, loop: this.loop, incident: layer === 'access' ? null : this.link(), waypoint: this.waypoint });
+    const svg = overviewSvg(this.s, { mode: this.mode, layer, selRoom: this.selRoom, selDoor: this.selDoor, selCorridor: this.selCorr, loop: this.loop, incident: layer === 'access' ? null : this.link(), waypoint: this.waypoint, crew: this.crew() });
     const loops = `<span class="grp" role="group" aria-label="Highlight a loop">${LOOPS.map((l) => `<button data-loop="${l.id}" aria-pressed="${this.loop === l.id}" title="${esc(l.note)}">${esc(l.name.replace(' loop', ''))}</button>`).join('')}<button data-loop="" aria-pressed="${!this.loop}">No loop</button></span>`;
     return `${this.toolbar(`<span class="grp" role="group" aria-label="Map style"><button data-a="mode-iso" aria-pressed="${this.mode === 'iso'}">Isometric plan</button><button data-a="mode-top" aria-pressed="${this.mode === 'top'}">Top-down schematic</button></span>${loops}<button data-a="to-systems">Open system diagram</button>`)}
       <div class="bp-canvas" data-vbkey="ov-${layer}-${this.mode}">${svg}</div>
@@ -145,7 +148,7 @@ export class BlueprintView {
     const lk = this.link(), s = this.s, m = s.mission;
     const toggle = `<span class="grp" role="group" aria-label="Show incident on"><button data-a="inc-map" aria-pressed="${this.incView === 'map'}">Show on facility map</button><button data-a="inc-diagram" aria-pressed="${this.incView === 'diagram'}">Show on system diagram</button></span>`;
     if (this.incView === 'map') {
-      const svg = overviewSvg(s, { mode: this.mode, layer: 'incident', selRoom: lk.sourceRoom, incident: lk, waypoint: this.waypoint });
+      const svg = overviewSvg(s, { mode: this.mode, layer: 'incident', selRoom: lk.sourceRoom, incident: lk, waypoint: this.waypoint, crew: this.crew() });
       return `${this.toolbar(`${toggle}<button data-a="mode-iso" aria-pressed="${this.mode === 'iso'}">Isometric</button><button data-a="mode-top" aria-pressed="${this.mode === 'top'}">Top-down</button>`)}<div class="bp-canvas" data-vbkey="in-${this.mode}">${svg}</div><p class="bp-hint">${esc(m.alert.headline)}</p>`;
     }
     const view = DIAGRAMS.find((d) => d.routeIds.some((r) => lk.routeIds.includes(r))) ?? DIAGRAMS[0];
@@ -190,7 +193,8 @@ export class BlueprintView {
       <p>${c.kind === 'maintenance' ? 'An optional maintenance corridor. It saves time but no mission ever needs it.' : 'A main corridor: always open between its two doors (the rooms at each end may still need a pass).'}</p>
       <dl><dt>Connects</dt><dd>${end(c.from)} ⇄ ${end(c.to)}</dd>
       <dt>Doors</dt><dd>${c.doors.map((d) => this.doorRow(DOOR_BY_ID[d])).join('<br>') || 'None (open ground at both ends)'}</dd><dt>State</dt><dd>${esc(li.reason)}</dd><dt>Size</dt><dd>${cells} floor cells, 2 wide</dd>
-      <dt>Part of</dt><dd>${inLoops.map((l) => esc(l.name)).join(', ') || 'No loop (a connector)'}</dd></dl>`;
+      <dt>Part of</dt><dd>${inLoops.map((l) => esc(l.name)).join(', ') || 'No loop (a connector)'}</dd></dl>
+      <div class="row"><button class="primary" data-a="walkcell" data-x="${c.rects[0].x + Math.floor(c.rects[0].w / 2)}" data-y="${c.rects[0].y + Math.floor(c.rects[0].h / 2)}">Walk to this corridor</button></div>`;
   }
 
   private roomPanel(id: RoomId | null): string {
@@ -322,6 +326,7 @@ export class BlueprintView {
         this.close(); this.host.toast(esc(r.note), 'good'); return;
       }
       case 'back-room': { this.close(); this.host.scene.flashTargets([`room:${d.room}`], 6000); this.host.scene.focusOn(`room:${d.room}`); setTimeout(() => this.host.scene.returnToPlayer(), 3500); return; }
+      case 'walkcell': this.host.scene.walkTo({ x: +d.x!, y: +d.y! }); this.close(); this.host.toast('Walking there.', 'info'); return;
       case 'board': this.close(); this.host.openBoard?.(); return;
     }
   }

@@ -169,11 +169,12 @@ export interface GraphEdge { route: RouteDef; from: string; to: string; index: n
 export const EDGES: GraphEdge[] = ROUTES.flatMap((r) => r.hops.slice(1).map((h, i) => ({ route: r, from: r.hops[i], to: h, index: i })));
 export const isReturning = (t: RouteType) => t === 'return' || t === 'agency_return';
 
-export interface DiagramView { id: 'finance' | 'carddebt' | 'events'; label: string; title: string; routeIds: string[]; note: string }
+export interface DiagramView { id: 'finance' | 'carddebt' | 'events' | 'expenses'; label: string; title: string; routeIds: string[]; note: string }
 export const DIAGRAMS: DiagramView[] = [
   { id: 'finance', label: 'Finance Flows', title: 'Finance payment flow', routeIds: ['service_payment_intake', 'supplier_payment_release', 'bank_response_reconciliation'], note: 'Requests enter through the API Gateway, are posted in Finance Core, released through Payment Orchestration and the BACS Vault to the simulated bank. Bank acknowledgements return the same way for reconciliation.' },
   { id: 'carddebt', label: 'Debt & Card', title: 'Card and debt flow', routeIds: ['card_receipt', 'debt_agency_export', 'agency_receipt'], note: 'Simulated card payments settle in Card Payments and post through Accounts Receivable. Approved debt exports leave through the Integration Exchange to the fictional agency; receipts come back the same approved way.' },
   { id: 'events', label: 'Events & Fabric', title: 'Events and analytics lineage', routeIds: ['finance_event_mirror', 'receipt_event_feed'], note: 'Finance modules and payment routes publish events to the Event Stream Hall, then Fabric lands them in Bronze, cleans them in Silver, publishes Gold, and feeds the reporting dashboard. Everything on this view is simulated while Demo data is on.' },
+  { id: 'expenses', label: 'Expenses & Payroll', title: 'Expense claims to the bank', routeIds: ['expense_payment'], note: 'Staff expense claims are checked in Expense Claims, approved by a manager, fed to the payroll system, batched in Payment Orchestration and paid through the BACS Vault to the simulated bank. Everything is synthetic.' },
 ];
 
 /** Layered layout for a diagram, computed from its routes: forward routes set the columns; returning routes run back along them. */

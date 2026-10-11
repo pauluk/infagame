@@ -88,6 +88,11 @@ export class FacilityScene extends Phaser.Scene implements SceneApi {
   constructor() { super('Facility'); }
 
   init(data: { mission: MissionDef; relaxed?: boolean }): void {
+    // Phaser re-uses this scene object when a mission is restarted or the next one begins: start from a clean slate
+    this.closing = false; this.fogSig = ''; this.wallSig = ''; this.waypoint = null; this.flash = { ids: [], until: 0 };
+    this.to = null; this.path = []; this.prog = 0; this.dragging = false; this.autoApproach = null; this.followPlayer = true; this.guideUntil = 0; this.guideCells = []; this.coachTargets = [];
+    this.walls = []; this.unsub = [];
+    for (const m of [this.doorSprites, this.readerSprites, this.roomLabels, this.roomObjs, this.waterLabels, this.propSprites, this.statusLabels, this.entitySprites, this.barriers, this.crewSprites, this.entityCache] as Map<unknown, unknown>[]) m.clear();
     this.state = new GameState(data.mission, data.relaxed ?? settings.data.relaxed);
     this.state.tutorial = settings.data.tutorial;
     this.runner = new MissionRunner(this.state);

@@ -19,12 +19,13 @@ const ALL_PASSES = new Set(Object.keys(PASSES) as PassId[]);
 const NO_ROOM_PASSES = new Set<PassId>(['ops_pass']);
 
 describe('facility map', () => {
-  it('has the 12 core rooms with their ids and codes, plus the Audit Gallery and the Payroll & Pensions office', () => {
+  it('has the 12 core rooms with their ids and codes, plus the Audit Gallery, the Payroll & Pensions office and Expense Claims', () => {
     const want: Record<string, string> = { api_gateway: 'A1', event_stream: 'B1', fabric_platform: 'C1', integration_exchange: 'D1', service_payments: 'A2', finance_core: 'B2', payment_orchestration: 'C2', bacs_vault: 'D2', secure_ops: 'A3', card_payments: 'B3', debt_recovery: 'C3', agency_handoff: 'D3' };
     for (const [id, code] of Object.entries(want)) expect(ROOM_BY_ID[id as RoomId]?.code).toBe(code);
     expect(ROOM_BY_ID.audit_gallery.name).toBe('Audit Gallery'); expect(ROOM_BY_ID.payroll_pensions.name).toBe('Payroll & Pensions Office');
     expect(ROOM_BY_ID.secure_ops.name).toBe('Secure Operations Atrium');
-    expect(ROOMS).toHaveLength(14);
+    expect(ROOM_BY_ID.expense_claims.name).toBe('Expense Claims'); expect(ROOM_BY_ID.expense_claims.wing).toBe('finance');
+    expect(ROOMS).toHaveLength(15);
   });
   it('is irregular: rooms differ in size, never overlap or touch, and sit in four wings around the atrium', () => {
     expect(new Set(ROOMS.map((r) => `${r.w}x${r.h}`)).size).toBeGreaterThanOrEqual(6);
@@ -35,7 +36,7 @@ describe('facility map', () => {
     expect(new Set(ROOMS.map((r) => r.wing))).toEqual(new Set(['atrium', 'data', 'finance', 'payments', 'collections']));
     const wingOf = (id: RoomId) => ROOM_BY_ID[id].wing;
     expect(['api_gateway', 'event_stream', 'fabric_platform', 'audit_gallery'].map((i) => wingOf(i as RoomId))).toEqual(['data', 'data', 'data', 'data']);
-    expect(['finance_core', 'service_payments'].map((i) => wingOf(i as RoomId))).toEqual(['finance', 'finance']);
+    expect(['finance_core', 'service_payments', 'expense_claims'].map((i) => wingOf(i as RoomId))).toEqual(['finance', 'finance', 'finance']);
     expect(['payment_orchestration', 'card_payments', 'bacs_vault'].map((i) => wingOf(i as RoomId))).toEqual(['payments', 'payments', 'payments']);
     expect(['debt_recovery', 'agency_handoff', 'payroll_pensions'].map((i) => wingOf(i as RoomId))).toEqual(['collections', 'collections', 'collections']);
   });
@@ -539,7 +540,7 @@ import { EQUIPMENT, EQUIPMENT_SPEC, GRAPH_ROOMS, CORRIDORS, DIAGRAMS, PORTS, lay
 describe('facility graph', () => {
   it('lists the 12 core rooms with the specified IDs, names and codes, and every room has a wing', () => {
     const want: Record<string, [string, string]> = { api_gateway: ['A1', 'API Gateway'], event_stream: ['B1', 'Event Stream Hall'], fabric_platform: ['C1', 'Fabric Data Platform'], integration_exchange: ['D1', 'Integration Exchange'], service_payments: ['A2', 'Service Payments'], finance_core: ['B2', 'Finance Core'], payment_orchestration: ['C2', 'Payment Orchestration'], bacs_vault: ['D2', 'BACS Vault'], secure_ops: ['A3', 'Secure Operations Atrium'], card_payments: ['B3', 'Card Payments'], debt_recovery: ['C3', 'Accounts Receivable & Debt Recovery'], agency_handoff: ['D3', 'Agency Hand-off'] };
-    expect(GRAPH_ROOMS.length).toBe(14);
+    expect(GRAPH_ROOMS.length).toBe(15);
     for (const [id, w] of Object.entries(want)) { const r = GRAPH_ROOMS.find((q) => q.id === id)!; expect([r.code, r.name]).toEqual(w); }
     for (const r of GRAPH_ROOMS) expect(r.wing).toBeDefined();
   });
@@ -1076,5 +1077,18 @@ describe('business-continuity missions', () => {
     expect(s.flags.flood_event_stream).toBe(true); expect(s.availability).toBeLessThan(100);
     const { s: done } = runScript(m);
     expect(done.flags.flood_event_stream).toBeFalsy(); expect(done.complete).toBe(true);
+  });
+});
+
+describe('Expense Claims: a service room whose claims flow to payroll and then the bank', () => {
+  it('has a route Expense Claims to Payroll & Pensions to Payment Orchestration to the BACS Vault to the bank, and a diagram for it', () => {
+    const r = ROUTES.find((q) => q.id === 'expense_payment')!;
+    expect(r.hops).toEqual(['expense_claims', 'payroll_pensions', 'payment_orchestration', 'bacs_vault', 'bank_sim']);
+    expect(routePoints(r).length).toBeGreaterThan(4);
+    expect(DIAGRAMS.some((d) => d.id === 'expenses' && d.routeIds.includes('expense_payment'))).toBe(true);
+  });
+  it('is reachable from open ground and needs its own optional pass', () => {
+    expect(nodeRoute('secure_ops', 'expense_claims', { maintenance: false, transit: (x) => x === 'secure_ops' })).not.toBeNull();
+    expect(PASS_BY_ROOM.expense_claims).toBe('expense_audit_pass');
   });
 });

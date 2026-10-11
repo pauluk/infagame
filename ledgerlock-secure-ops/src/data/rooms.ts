@@ -128,6 +128,14 @@ export const SPECS: RoomSpec[] = [
     ['desk', 'd_desk_set', 2, 4, 'Payroll Desk', 'A sticky note: "Payroll and pensions are not the same person."', false],
     ['plant', 'd_plant_small', 5, 5, 'Office Plant', 'Watered on payday.', false],
   ] },
+  { id: 'expense_claims', code: 'E3', name: 'Expense Claims', wing: 'finance', accent: 'mint', blurb: 'Staff expense claims are checked here, then sent to the payroll system so they are paid with salaries and out through the bank. All claims are synthetic.', props: [
+    ['claims_intake', 'i_terminal_cyan', 2, 1, 'Claims Intake Terminal', 'New expense claims arrive here with masked receipts (synthetic).'],
+    ['policy_checker', 'i_console_payment', 6, 1, 'Policy Checker', 'Checks each claim against the expense policy and limits.'],
+    ['approval_queue', 'i_rack_mint', 4, 3, 'Manager Approval Queue', 'Claims wait for the line manager. Nobody approves their own claim.'],
+    ['payroll_feed', 'i_rack_cyan', 8, 3, 'Payroll Feed', 'Approved claims leave here for the payroll system (Payroll & Pensions).'],
+    ['desk', 'd_desk_set', 2, 5, 'Claims Desk', 'A sticky note: "Receipts first. Opinions later."', false],
+    ['plant', 'd_plant_small', 8, 6, 'Fern', 'Thrives on unclaimed coffee.', false],
+  ] },
 ];
 /** Workstation bays: small offices or terminals attached to a system room. They are props, not rooms, and sit inside the room that owns them. */
 export interface BayDef { id: string; room: RoomId; prop: string; dept: string; roles: string[]; label: string }

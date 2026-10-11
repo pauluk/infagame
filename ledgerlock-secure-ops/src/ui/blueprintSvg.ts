@@ -32,7 +32,7 @@ const DEFS = `<defs>
 
 // ------------------------------------------------------------------------------------------------ overview ----
 export type MapLayer = 'facility' | 'access' | 'incident';
-export interface OverviewOpts { mode: 'iso' | 'top'; layer: MapLayer; selRoom: RoomId | null; selDoor?: string | null; selCorridor?: string | null; loop?: string | null; incident: IncidentLink | null; waypoint?: { x: number; y: number } | null }
+export interface OverviewOpts { mode: 'iso' | 'top'; layer: MapLayer; selRoom: RoomId | null; selDoor?: string | null; selCorridor?: string | null; loop?: string | null; incident: IncidentLink | null; waypoint?: { x: number; y: number } | null; crew?: { id: string; name: string; colour: string; x: number; y: number; note: string }[] }
 
 /** Colour-blind-safe door states (Okabe-Ito): the shape and the word carry the meaning as well as the colour. */
 export const DOOR_STYLE: Record<DoorStatus, { colour: string; glyph: string; word: string; dash: string }> = {
@@ -127,6 +127,7 @@ export function overviewSvg(s: GameState, o: OverviewOpts): string {
   if (o.waypoint) { const w = P(o.waypoint.x + 0.5, o.waypoint.y + 0.5); out.push(`<circle cx="${w[0]}" cy="${w[1]}" r="${fs * 0.8}" fill="none" stroke="#37D7D0" stroke-width="4"/><text x="${w[0]}" y="${w[1] - 14}" text-anchor="middle" fill="#37D7D0" font-size="${fs}" font-weight="700">Waypoint</text>`); }
   const pl = P(s.player.x, s.player.y);
   out.push(`<g aria-label="You are here"><circle cx="${pl[0]}" cy="${pl[1]}" r="${fs * 0.7}" fill="#F0E442" stroke="#0B1424" stroke-width="3"/><text x="${pl[0]}" y="${pl[1] - fs}" text-anchor="middle" fill="#F0E442" font-size="${fs + 1}" font-weight="800" stroke="#0B1424" stroke-width="3" paint-order="stroke">You</text></g>`);
+  for (const m of o.crew ?? []) { const q = P(m.x, m.y); out.push(`<g class="bp-crew" aria-label="${esc(m.name)}: ${esc(m.note)}"><circle cx="${q[0]}" cy="${q[1]}" r="${fs * 0.55}" fill="${m.colour}" stroke="#0B1424" stroke-width="3"/><text x="${q[0]}" y="${q[1] + fs * 0.25}" text-anchor="middle" fill="#0B1424" font-size="${fs * 0.7}" font-weight="800">${esc(m.name[0])}</text><text x="${q[0]}" y="${q[1] - fs * 0.8}" text-anchor="middle" fill="${m.colour}" font-size="${fs - 3}" font-weight="700" stroke="#0B1424" stroke-width="3" paint-order="stroke">${esc(m.name)}</text><title>${esc(m.name)}: ${esc(m.note)}</title></g>`); }
   out.push('</svg>');
   return out.join('');
 }

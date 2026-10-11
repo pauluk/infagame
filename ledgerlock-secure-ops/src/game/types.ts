@@ -4,7 +4,7 @@ export type RoomId =
   | 'api_gateway' | 'event_stream' | 'fabric_platform' | 'integration_exchange'
   | 'service_payments' | 'finance_core' | 'payment_orchestration' | 'bacs_vault'
   | 'secure_ops' | 'card_payments' | 'debt_recovery' | 'agency_handoff'
-  | 'audit_gallery' | 'payroll_pensions';
+  | 'audit_gallery' | 'payroll_pensions' | 'expense_claims';
 
 export type ExternalId = 'bank_sim' | 'card_network_sim' | 'agency_sim' | 'reporting_display';
 
@@ -12,7 +12,7 @@ export type PassId =
   | 'ops_pass' | 'service_audit_pass' | 'api_audit_pass' | 'payments_audit_pass' | 'event_trace_pass'
   | 'ledger_read_pass' | 'payment_ops_pass' | 'bacs_audit_pass' | 'debt_read_pass'
   | 'agency_audit_pass' | 'fabric_observer_pass' | 'integration_audit_pass'
-  | 'audit_gallery_pass' | 'staff_office_pass'
+  | 'audit_gallery_pass' | 'staff_office_pass' | 'expense_audit_pass'
   | 'maintenance_pass' | 'courier_pass'   // open optional maintenance shortcuts, never a required route
   | 'token_rotation_pass';        // special: time-limited rotation approval (opens no door)
 
