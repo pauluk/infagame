@@ -217,8 +217,8 @@ describe('Duplicate Ghost mission logic', () => {
 
 describe('campaign missions', () => {
   it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'blue-lantern', 'blue-lantern-gap', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {
@@ -247,6 +247,7 @@ function runScript(m: ScenarioMission, opts: { skipRecord?: boolean } = {}) {
       const dlg = d.shift();
       if (dlg.type === 'confirm') dlg.onConfirm();
       else if (dlg.type === 'choice' || dlg.type === 'meeting') { const step = m.spec.steps.find((x) => (x.choice ?? x.meeting)?.title === dlg.title); const c = (step!.choice ?? step!.meeting)!; const o = c.options.find((x) => x.correct) ?? c.options[0]; dlg.onChoose(o.id); }
+      else if (dlg.type === 'emergency') dlg.autoSolve();
       else if (dlg.type === 'timeline' && dlg.onClose) dlg.onClose();
     }
   };
@@ -409,7 +410,7 @@ function teamRun(m: (typeof MISSIONS)[number], o: { team: boolean; autoDecide: b
     for (const it of team.inbox) if (!it.resolved && it.kind === 'decision' && o.answer !== false) {
       const sp = it.spec as any; if (sp.type === 'choice' || sp.type === 'meeting') sp.onChoose(m.bestChoice?.[sp.title] ?? sp.options[0].id); else sp.onConfirm();
     }
-    while (modal.length) { const d = modal.shift(); if (d.type === 'choice' || d.type === 'meeting') d.onChoose(m.bestChoice?.[d.title] ?? d.options[0].id); else if (d.type === 'confirm') d.onConfirm(); else if (d.type === 'timeline' && d.onClose) d.onClose(); }
+    while (modal.length) { const d = modal.shift(); if (d.type === 'choice' || d.type === 'meeting') d.onChoose(m.bestChoice?.[d.title] ?? d.options[0].id); else if (d.type === 'confirm') d.onConfirm(); else if (d.type === 'emergency') d.autoSolve(); else if (d.type === 'timeline' && d.onClose) d.onClose(); }
   }
   return { s, team, run };
 }
@@ -584,7 +585,7 @@ describe('incident board data', () => {
     expect(new Set(INCIDENTS.map((i) => i.puzzleType))).toEqual(new Set(['cable', 'match', 'missing', 'verify']));
     for (const m of MISSIONS) {
       const defs = INCIDENTS_BY_MISSION[m.id] ?? [];
-      if (m.order > 0) expect(defs.length, m.id).toBeGreaterThanOrEqual(3);
+      if (m.order > 0 && !m.id.startsWith('blue-lantern')) expect(defs.length, m.id).toBeGreaterThanOrEqual(3);
       const ids = new Set(playbookFor(m).map((a) => a.id)), goals = new Set(m.goals.map((g) => g.id)), ev = new Set(m.evidence.map((e) => e.id));
       for (const d of defs) {
         const w = `${d.incidentId} (${m.id})`;
@@ -1091,5 +1092,107 @@ describe('Expense Claims: a service room whose claims flow to payroll and then t
   it('is reachable from open ground and needs its own optional pass', () => {
     expect(nodeRoute('secure_ops', 'expense_claims', { maintenance: false, transit: (x) => x === 'secure_ops' })).not.toBeNull();
     expect(PASS_BY_ROOM.expense_claims).toBe('expense_audit_pass');
+  });
+});
+
+// ---------------------------------------------------------------- Blue Lantern ----
+import { BlueLantern, ITEMS, LIMITS, PROVIDER, ACCOUNTS } from '../src/game/systems/BlueLantern';
+
+describe('Blue Lantern: emergency payment continuity', () => {
+  const fresh = (variant: 'normal' | 'gap' = 'normal') => {
+    const m = MISSIONS.find((x) => x.id === (variant === 'gap' ? 'blue-lantern-gap' : 'blue-lantern'))!;
+    const s = new GameState(m); BlueLantern.init(s, variant); return { s, b: BlueLantern.for(s) };
+  };
+  const upTo = (b: BlueLantern, stage: string) => { for (const st of ['triage', 'scope', 'govern', 'configure', 'prepare', 'review', 'submit', 'reconcile', 'restore']) { b.solve(st); if (st === stage) break; } };
+
+  it('the full by-the-book path completes every stage with no penalty and a top score', () => {
+    const { s, b } = fresh(); upTo(b, 'restore');
+    for (const st of ['triage', 'scope', 'govern', 'configure', 'prepare', 'review', 'submit', 'reconcile', 'restore'] as const) expect(b.stageDone(st), st).toBe(true);
+    expect(b.d.penalties).toEqual([]); expect(b.scoreboard().total).toBeGreaterThanOrEqual(90);
+    expect(b.d.conn.status).toBe('inactive'); expect(b.d.restore.deactivated).toBe(true);
+    expect(s.flags.st_restore).toBe(true);
+  });
+  it('seeds the invoices exactly as briefed', () => {
+    const [A, B, C, D, E] = ITEMS;
+    expect(A.ideal).toBe('eligible'); expect(B.changed).toBe(true); expect(C.cls).toBe('unknown'); expect(D.ref).toBe(A.ref); expect(E.value).toBeGreaterThan(LIMITS.txn);
+  });
+  it('rule 1: the route cannot be configured before governance, nor tested before every item is reviewed', () => {
+    const { b } = fresh(); upTo(b, 'scope');
+    expect(b.review('secure_ops', 'record').ok).toBe(false);
+    upTo(b, 'govern');
+    const r = b.handshake('secure_ops'); expect(r.ok).toBe(false); expect(b.d.conn.status).toBe('inactive');
+    expect(b.noValueTest('secure_ops').ok).toBe(false);
+  });
+  it('rule 1b: an unverified look-alike endpoint and the payroll account are refused with consequences', () => {
+    const { b } = fresh(); upTo(b, 'govern');
+    expect(b.review('secure_ops', 'identity', 'secure-paylink-northstar.example.net').ok).toBe(false);
+    expect(b.review('secure_ops', 'account', 'payroll').ok).toBe(false);
+    expect(b.d.penalties.filter((p) => p.cat === 'governance').length).toBe(2); expect(ACCOUNTS.payroll.eligible).toBe(false);
+  });
+  it('rule 2: each person may do only their own job, and a wrong-desk approval is penalised', () => {
+    const { b } = fresh(); upTo(b, 'scope');
+    expect(b.strategicApprove('ap').ok).toBe(false); expect(b.d.penalties.some((p) => p.cat === 'separation')).toBe(true);
+    upTo(b, 'prepare');
+    expect(b.treasuryCheck('ap', 'account', 'ops').ok).toBe(false);
+    expect(b.treasurySign('ap').ok).toBe(false);
+    expect(b.prepareBatch('treasury').ok).toBe(false); expect(b.d.batch!.maker).toBe('ap');
+  });
+  it('rule 2b: Treasury cannot sign a rushed review, and the second approval needs Treasury first', () => {
+    const { b } = fresh(); upTo(b, 'prepare');
+    expect(b.treasurySign('treasury').ok).toBe(false); expect(b.d.penalties.some((p) => /rushed/.test(p.text))).toBe(true);
+    expect(b.independentApproveBatch('independent').ok).toBe(false);
+    expect(b.submit('secure_ops').ok).toBe(false);
+  });
+  it('rule 3: the payroll-only account can never be the source', () => {
+    const { b } = fresh(); upTo(b, 'prepare');
+    expect(b.treasuryCheck('treasury', 'account', 'payroll').ok).toBe(false); expect(b.d.treasury.account).toBeNull();
+  });
+  it('rule 4: changed-supplier, unknown, duplicate and over-limit items cannot enter the batch', () => {
+    const { b } = fresh(); upTo(b, 'configure');
+    for (const id of ['B', 'C', 'D', 'E']) expect(b.moveToLane('ap', id, 'eligible').ok, id).toBe(false);
+    expect(b.d.penalties.length).toBe(4);
+    expect(b.moveToLane('ap', 'A', 'eligible').ok).toBe(true);
+    expect(b.verifySupplier('independent', 'B').ok).toBe(true); expect(b.moveToLane('ap', 'B', 'eligible').ok).toBe(true);
+  });
+  it('rule 5: resending an uncertain or duplicate item is a visible consequence, and Pending is never auto-resent', () => {
+    const { b } = fresh(); upTo(b, 'review');
+    b.submit('secure_ops', { extra: ['C', 'D'] });
+    expect(b.d.acks.C.status).toBe('Rejected'); expect(b.d.penalties.filter((p) => p.cat === 'duplicates').length).toBe(2);
+    expect(b.d.acks.B.status).toBe('Pending'); expect(b.decide('secure_ops', 'B', 'processed').ok).toBe(false);
+    expect(b.decide('secure_ops', 'B', 'monitor').ok).toBe(true);
+  });
+  it('rule 5b: processed needs all four sources; the normal route cannot be restored before reconciliation', () => {
+    const { b } = fresh(); upTo(b, 'submit');
+    expect(b.decide('secure_ops', 'A', 'processed').ok).toBe(false);
+    expect(b.restoreRoute('secure_ops').ok).toBe(false);
+    expect(b.investigateC('secure_ops', ['bank']).ok).toBe(false);
+  });
+  it('the emergency connection expires by itself and then blocks submission until re-approved', () => {
+    const { s, b } = fresh(); upTo(b, 'review');
+    s.elapsed += (LIMITS.hours * 60 + 5) * 8; b.tick();
+    expect(b.d.conn.status).toBe('expired'); expect(b.submit('secure_ops').ok).toBe(false);
+  });
+  it('rule 6: when the provider fails governance, escalate, keep it inactive, preserve the queue and defer, for full marks', () => {
+    const { b } = fresh('gap'); upTo(b, 'scope');
+    expect(b.strategicApprove('strategic').ok).toBe(false); expect(b.d.govern.blocked).toBe(true);
+    expect(b.deferSafely('secure_ops').ok).toBe(false);          // escalate first
+    expect(b.review('secure_ops', 'record').ok).toBe(false);
+    b.solve('govern');
+    expect(b.d.deferred).toBe(true); expect(b.d.conn.status).toBe('inactive'); expect(b.d.preserved).toBe(true);
+    expect(b.d.penalties).toEqual([]); expect(b.scoreboard().cats.find((c) => c.id === 'governance')!.points).toBe(20);
+    expect(PROVIDER.dueDiligence).toBe('valid');                // the gap is the scenario's own copy, not the shared record
+  });
+  it('misclassifying an item is explained and costs points', () => {
+    const { b } = fresh();
+    const r = b.classify('secure_ops', 'C', 'sent'); expect(r.ok).toBe(false); expect(r.text).toMatch(/Unknown/);
+    expect(b.d.penalties.length).toBe(1);
+  });
+  it('the map marks the affected rooms and Secure Ops reaches AP and Treasury without Payment Orchestration', () => {
+    const m = MISSIONS.find((x) => x.id === 'blue-lantern')!;
+    expect(m.affectedRooms).toEqual(expect.arrayContaining(['payment_orchestration', 'finance_core', 'secure_ops', 'integration_exchange']));
+    const passes = new Set<PassId>(['ops_pass', 'ledger_read_pass', 'payment_ops_pass', 'integration_audit_pass', 'bcp_pass']);
+    const a = ROOM_BY_ID.secure_ops, from = nearestWalkable(walkableFor(passes), a.x0 + a.w / 2, a.y0 + a.h / 2, 4)!;
+    for (const t of ['prop:finance_core.ap', 'prop:payment_orchestration.treasury_ws_a', 'prop:integration_exchange.connection_panel', 'prop:bcp_command.bronze_table'])
+      expect(standFor(t, from, passes), t).not.toBeNull();
   });
 });

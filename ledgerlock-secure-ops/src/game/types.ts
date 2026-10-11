@@ -102,6 +102,7 @@ export type DialogSpec =
   | { type: 'timeline'; title: string; steps: { time: string; text: string; tone: Tone }[]; conclusion: string; onClose?: () => void }
   | { type: 'choice'; title: string; body: string; options: { id: string; label: string; detail: string }[]; onChoose: (id: string) => void }
   | { type: 'meeting'; title: string; body: string; attendees: MeetingAttendee[]; options: { id: string; label: string; detail: string; backers?: string[] }[]; confirmLabel?: string; onChoose: (id: string) => void }
+  | { type: 'emergency'; title: string; role: string; tab: string; autoSolve: () => void }
   | { type: 'info'; title: string; body: string; rows?: [string, string][]; compare?: { before: [string, string][]; after: [string, string][] } }
   | { type: 'alert' }
   | { type: 'access'; readerRoom?: RoomId; door?: string }

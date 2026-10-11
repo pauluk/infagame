@@ -3,6 +3,7 @@ import type { GameState } from '../../game/systems/GameState';
 import type { EvidenceDef, MeetingAttendee, PassId, RoomId, ToolId, Tone } from '../../game/types';
 import { PASSES } from '../passes';
 import { propTarget } from '../targets';
+import { BlueLantern } from '../../game/systems/BlueLantern';
 
 type Gain = Partial<Record<'integrity' | 'protection' | 'recovery' | 'audit', number>>;
 export interface Info { title: string; rows?: [string, string][]; body: string; compare?: { before: [string, string][]; after: [string, string][] } }
@@ -21,6 +22,8 @@ export interface StepSpec {
   /** A Bronze meeting: service managers report (live, from the game state) and the team decides together. */
   meeting?: { title: string; body: string | ((a: MissionApi) => string); attendees: (a: MissionApi) => MeetingAttendee[]; options: (ChoiceOption & { backers?: string[] })[] };
   confirm?: { title: string; body: string; impacts: { label: string; text: string; tone: Tone }[]; confirmLabel?: string };
+  /** Blue Lantern: opens the emergency-payment panel at this desk instead of completing by itself; the rule engine marks the step done. */
+  emergency?: { role: string; tab: string; title: string };
   say?: [string, string, Tone];
   fx?: 'scan' | 'sparkle' | 'repair';
   gain?: Gain;
@@ -48,6 +51,9 @@ export interface ScenarioSpec {
   tick?: (a: MissionApi, dt: number) => void;
   interactions?: MissionDef['interactions'];
   onRevoke?: MissionDef['onRevoke'];
+  /** Blue Lantern: sets up the emergency-payment rule engine (normal run, or the provider-governance-gap variant). */
+  blue?: 'normal' | 'gap';
+  affectedRooms?: RoomId[];
   incidents?: (s: GameState) => number;
   narrow?: (s: GameState) => number;
   debrief: { what: string; learn: string; response?: (s: GameState) => string[]; nextStep: (s: GameState) => string };
@@ -80,6 +86,11 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
       if (ev && !a.s.passes.has(ev.requiredPass)) { a.say('Access denied', `${ev.name} needs the ${PASSES[ev.requiredPass].name}.`, 'warn', { hint: true }); return; }
     }
     const info = typeof step.info === 'function' ? step.info(a) : step.info;
+    if (step.emergency) {
+      const e = step.emergency;
+      a.dialog({ type: 'emergency', title: e.title, role: e.role, tab: e.tab, autoSolve: () => BlueLantern.for(a.s).solve(step.id) });
+      return;
+    }
     if (step.meeting) {
       const c = step.meeting;
       a.dialog({
@@ -119,7 +130,7 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
     const cands = stepsFor(target, tool);
     if (!cands.length) return;
     const okNeeds = (x: StepSpec) => (x.needs ?? []).every((n) => done(a.s, n)) && (!x.needsPass || a.s.passes.has(x.needsPass));
-    const pick = cands.find((x) => !done(a.s, x.id) && okNeeds(x));
+    const pick = cands.find((x) => !done(a.s, x.id) && okNeeds(x)) ?? cands.find((x) => x.emergency && okNeeds(x));
     if (!pick) {
       const blocked = cands.find((x) => !done(a.s, x.id));
       if (blocked) return a.say('Not just yet', blocked.needsMsg ?? 'Another step needs to happen first.', 'warn', { hint: true });
@@ -165,11 +176,12 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
     evidencePath: sp.evidencePath, evidence: sp.evidence, incidentRoute: sp.incidentRoute,
     passGrants: Object.fromEntries(sp.passes.map((p) => [p.pass, { when: p.when, hint: p.hint }])),
     requiredPasses: sp.required,
+    affectedRooms: sp.affectedRooms,
     rules, containment, interactions,
     goals: sp.goals, recordables: sp.recordables,
     objectives: (primary.length ? primary : sp.goals.filter((g) => g.kind === 'optional')).map((g) => ({ id: g.id, text: g.text, hint: g.hint ?? 'Follow the evidence.', done: g.done })),
-    setup: (a) => { sp.setup?.(a); },
-    tick: sp.tick,
+    setup: (a) => { if (sp.blue) BlueLantern.init(a.s, sp.blue); sp.setup?.(a); },
+    tick: sp.blue ? (a, dt) => { BlueLantern.for(a.s).tick(); sp.tick?.(a, dt); } : sp.tick,
     onRevoke: sp.onRevoke,
     canReport: (s) => { const missing = primary.find((g) => !g.done(s)); return missing ? `Primary objective outstanding: ${missing.text}` : true; },
     isComplete: (s) => !!s.flags.reported,

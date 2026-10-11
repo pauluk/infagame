@@ -249,6 +249,10 @@ export class TeamController {
         const it = this.inbox[this.inbox.length - 1];
         return true;
       }
+      case 'emergency': {
+        if (auto) { this.postReport(m, spec.title, `${m.name} worked the emergency payment desk by the book.`); spec.autoSolve(); return true; }
+        this.postReport(m, spec.title, 'This desk needs your decisions. Open it yourself.'); return true;
+      }
       case 'info': this.postReport(m, spec.title, spec.body, spec); return true;
       case 'timeline': { const { onClose, ...rest } = spec; this.postReport(m, spec.title, spec.conclusion, rest); onClose?.(); return true; }
       default: return true;                                    // alert / board / goals / access: nothing to ask of anyone
