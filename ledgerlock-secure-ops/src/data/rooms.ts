@@ -1,7 +1,7 @@
 import type { RoomDef, RoomId } from '../game/types';
 
-export type Wing = 'atrium' | 'data' | 'finance' | 'payments' | 'collections';
-export const WING_NAMES: Record<Wing, string> = { atrium: 'Secure Operations Atrium', data: 'Data Wing', finance: 'Finance Operations Wing', payments: 'Payment Rails Wing', collections: 'Collections & Staff Wing' };
+export type Wing = 'atrium' | 'data' | 'finance' | 'payments' | 'collections' | 'command';
+export const WING_NAMES: Record<Wing, string> = { atrium: 'Secure Operations Atrium', data: 'Data Wing', finance: 'Finance Operations Wing', payments: 'Payment Rails Wing', collections: 'Collections & Staff Wing', command: 'BCP Command' };
 
 export type PropSpec = [key: string, sprite: string, rx: number, ry: number, name: string, desc: string, interactive?: boolean];
 export interface RoomSpec { id: RoomId; code: string; name: string; wing: Wing; accent: RoomDef['accent']; blurb: string; props: PropSpec[] }
@@ -132,9 +132,20 @@ export const SPECS: RoomSpec[] = [
     ['claims_intake', 'i_terminal_cyan', 2, 1, 'Claims Intake Terminal', 'New expense claims arrive here with masked receipts (synthetic).'],
     ['policy_checker', 'i_console_payment', 6, 1, 'Policy Checker', 'Checks each claim against the expense policy and limits.'],
     ['approval_queue', 'i_rack_mint', 4, 3, 'Manager Approval Queue', 'Claims wait for the line manager. Nobody approves their own claim.'],
-    ['payroll_feed', 'i_rack_cyan', 8, 3, 'Payroll Feed', 'Approved claims leave here for the payroll system (Payroll & Pensions).'],
+    ['payroll_feed', 'i_rack_cyan', 7, 3, 'Payroll Feed', 'Approved claims leave here for the payroll system (Payroll & Pensions).'],
     ['desk', 'd_desk_set', 2, 5, 'Claims Desk', 'A sticky note: "Receipts first. Opinions later."', false],
-    ['plant', 'd_plant_small', 8, 6, 'Fern', 'Thrives on unclaimed coffee.', false],
+    ['plant', 'd_plant_small', 6, 6, 'Fern', 'Thrives on unclaimed coffee.', false],
+  ] },
+  { id: 'bcp_command', code: 'F1', name: 'BCP Command Centre (Bronze)', wing: 'command', accent: 'amber', blurb: 'Where the Bronze team meets during a continuity incident: service managers report, decisions are made and communications are agreed. Everyone here is fictional.', props: [
+    ['situation_wall', 'i_screen_dashboard', 4, 1, 'Situation Wall', 'Service status, the clock and the decision log for the incident, as the Bronze team sees them.'],
+    ['comms_board', 'i_terminal_blue', 7, 1, 'Communications Board', 'Where the Bronze team agrees what is said to staff, customers and the regulator, and when.'],
+    ['bronze_table', 'i_table_map', 4, 3, 'Bronze Command Table', 'Report to the Bronze team, hear from each service manager and take the decisions together.'],
+    ['seat_payments', 'i_terminal_blue', 1, 2, 'Payments Service Manager (Amara Okoye)', 'Amara runs payments. Ask what the incident means for payment runs.'],
+    ['seat_data', 'i_terminal_cyan', 1, 4, 'Data & Analytics Service Manager (Tomás Reyes)', 'Tomás runs the event stream and Fabric. Ask about data and reporting.'],
+    ['seat_collections', 'i_terminal_violet', 8, 4, 'Collections Service Manager (Priyanka Shah)', 'Priyanka runs receivables and the agency link. Ask about collections.'],
+    ['seat_security', 'i_console_ops', 7, 5, 'Information Security Lead (Elena Novak)', 'Elena leads security. Ask what she can see and what she recommends.'],
+    ['desk', 'd_desk_set', 2, 6, 'Scribe\'s Desk', 'The decision log is kept here. Every decision has a time and an owner.', false],
+    ['plant', 'd_plant_small', 8, 7, 'Bronze Plant', 'Has attended every incident. Never says a word.', false],
   ] },
 ];
 /** Workstation bays: small offices or terminals attached to a system room. They are props, not rooms, and sit inside the room that owns them. */

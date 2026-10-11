@@ -340,3 +340,11 @@ body.team-open #passes, body.team-open #legend { display: none; }
 .bp-door:focus-visible, .bp-corr:focus-visible, .bp-room:focus-visible { outline: 3px solid #F3F6FA; outline-offset: 2px; }
 .bp-room.unknown { cursor: pointer; }
 .bp-corr { cursor: pointer; }
+
+/* ---- Bronze meeting ---- */
+.meet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; margin: 10px 0; }
+.att { display: flex; gap: 10px; padding: 8px 10px; border-radius: 10px; border: 1px solid #2c4a75; border-left-width: 5px; background: rgba(20, 38, 64, .7); }
+.att.good { border-left-color: #009E73; } .att.warn { border-left-color: #E69F00; } .att.bad { border-left-color: #D55E00; }
+.att .av svg { width: 44px; height: 44px; border-radius: 50%; }
+.att .says { margin: 4px 0 0; font-style: italic; }
+.options .backers { color: #9DE3B1; }

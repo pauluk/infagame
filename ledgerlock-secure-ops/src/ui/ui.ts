@@ -13,6 +13,7 @@ import { MEASURE_KEYS, MEASURE_LABEL, confidenceWord, measuresOf, overallConfide
 import { PASSES } from '../data/passes';
 import { DOOR_BY_ID, FAC_H, FAC_W, FAC_X0, FAC_Y0, GRID, LINKS, LINK_BY_ID, LINK_RULES, ROOMS, ROOM_BY_ID, EXTERNAL_BY_ID, EXTERNALS, doorInfo } from '../data/map';
 import { isKnown } from '../game/systems/Fog';
+import { avatarSvg } from './avatar';
 import { ROUTES, ROUTE_BY_ID, STATE_LABEL, routePoints } from '../data/routes';
 import { describeTarget } from '../data/targets';
 import { app } from '../app';
@@ -133,7 +134,7 @@ export class UI {
     const card = (m: (typeof MISSIONS)[number]) => {
       const rec = campaign.data.missions[m.id]; const unlocked = campaign.isUnlocked(m, MISSIONS);
       const prim = m.goals.filter((g) => g.kind === 'primary'), opt = m.goals.filter((g) => g.kind === 'optional'), str = m.goals.filter((g) => g.kind === 'stretch');
-      const prev = m.order === 9 ? MISSION_BY_ID['duplicate-ghost'] : CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
+      const prev = m.order === 9 || m.order === 12 ? MISSION_BY_ID['duplicate-ghost'] : CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
       const status = rec?.completed ? `<span class="chip good">✓ Completed · best ${rec.best}/100</span>` : unlocked ? '<span class="chip info">Available</span>' : `<span class="chip warn">🔒 Locked: complete ${esc(prev?.title ?? 'the tutorial')}</span>`;
       return `<div class="mcard ${unlocked ? '' : 'locked'}"><h3>${m.order ? m.order + '. ' : ''}${esc(m.title)} ${status}</h3><div class="small">${esc(m.tagline)}</div><div class="small"><i>${esc(m.theme)}</i></div>
         ${prim.length ? `<div class="small"><b>Primary objectives (${rec ? rec.primary.length : 0}/${prim.length})</b><ul>${prim.map((g) => `<li>${rec?.primary.includes(g.id) ? '✓' : '○'} ${esc(g.text)}</li>`).join('')}</ul></div>` : ''}
@@ -720,6 +721,15 @@ export class UI {
         };
         break;
       }
+      case 'meeting': {
+        const ST = { ok: ['good', '✓ Steady'], warn: ['warn', '⚠ Under strain'], bad: ['bad', '✕ Down'] } as const;
+        card(`<div class="chip warn">BCP Command Centre · Bronze team</div><h2 style="margin-top:6px">${esc(d.title)}</h2><p>${esc(d.body)}</p>
+          <div class="meet-grid" aria-label="Service managers at the table">${d.attendees.map((a) => `<div class="att ${ST[a.status][0]}"><div class="av">${avatarSvg('bronze:' + a.name, a.name, 44)}</div><div><b>${esc(a.name)}</b> <span class="chip ${ST[a.status][0]}">${ST[a.status][1]}</span><div class="small">${esc(a.role)} · ${esc(a.service)}</div><p class="says">“${esc(a.says)}”</p></div></div>`).join('')}</div>
+          <h3>Decision for the Bronze team</h3><div class="options">${d.options.map((o) => `<button data-o="${o.id}"><b>${esc(o.label)}</b><small>${esc(o.detail)}</small>${o.backers?.length ? `<small class="backers">Backed by: ${o.backers.map(esc).join(', ')}</small>` : ''}</button>`).join('')}</div>
+          <p class="small">Decisions are recorded in the log with the time and the owner. Pick the one the evidence supports, not the one most people lean towards.</p>`, 'wide');
+        wrap.onclick = (e) => { const o = (e.target as HTMLElement).closest('button')?.dataset.o; if (o) close(() => d.onChoose(o)); };
+        break;
+      }
       case 'info': {
         const rows = d.rows ? `<table class="t">${d.rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>` : '';
         const cmp = d.compare ? `<div class="grid2"><div class="mcard"><h3>Before</h3><table class="t">${d.compare.before.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></div><div class="mcard" style="border-color:var(--mint)"><h3>✓ After</h3><table class="t">${d.compare.after.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></div></div>` : '';
@@ -761,14 +771,14 @@ export class UI {
    */
   private autoResolve(d: DialogSpec, wrap: HTMLElement): void {
     const team = this.scene?.team; if (!team?.anyAuto() || d.type === 'access') return;
-    const decides = d.type === 'choice' || d.type === 'confirm';
+    const decides = d.type === 'choice' || d.type === 'confirm' || d.type === 'meeting';
     if (decides && !settings.data.autoDecide) return;
     if (performance.now() - this.lastInput < 2500) return;
     const seen = this.lastInput;
     window.setTimeout(() => {
       if (!wrap.isConnected || this.lastInput !== seen || !this.state) return;
       let btn: HTMLElement | null = null;
-      if (d.type === 'choice') { const best = this.state.mission.bestChoice?.[d.title] ?? d.options[0].id; btn = wrap.querySelector(`[data-o="${best}"]`); }
+      if (d.type === 'choice' || d.type === 'meeting') { const best = this.state.mission.bestChoice?.[d.title] ?? d.options[0].id; btn = wrap.querySelector(`[data-o="${best}"]`); }
       else btn = wrap.querySelector('[data-a="ok"]') ?? wrap.querySelector('button.primary');
       if (!btn) return;
       const title = 'title' in d ? d.title : d.type === 'alert' ? 'Alert' : d.type === 'goals' ? 'Goals' : 'Update';

@@ -235,6 +235,7 @@ export class IncidentBoard {
     const prev = s.decide;
     s.decide = (spec) => {
       switch (spec.type) {
+        case 'meeting': spec.onChoose(best[spec.title] ?? spec.options[0].id); return true;
         case 'choice': spec.onChoose(best[spec.title] ?? spec.options[0].id); return true;
         case 'confirm': spec.onConfirm(); return true;
         case 'info': this.reports.push({ inc: d.incidentId, title: spec.title, spec }); return true;

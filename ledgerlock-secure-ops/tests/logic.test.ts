@@ -19,13 +19,14 @@ const ALL_PASSES = new Set(Object.keys(PASSES) as PassId[]);
 const NO_ROOM_PASSES = new Set<PassId>(['ops_pass']);
 
 describe('facility map', () => {
-  it('has the 12 core rooms with their ids and codes, plus the Audit Gallery, the Payroll & Pensions office and Expense Claims', () => {
+  it('has the 12 core rooms with their ids and codes, plus the Audit Gallery, the Payroll & Pensions office, Expense Claims and the BCP Command Centre', () => {
     const want: Record<string, string> = { api_gateway: 'A1', event_stream: 'B1', fabric_platform: 'C1', integration_exchange: 'D1', service_payments: 'A2', finance_core: 'B2', payment_orchestration: 'C2', bacs_vault: 'D2', secure_ops: 'A3', card_payments: 'B3', debt_recovery: 'C3', agency_handoff: 'D3' };
     for (const [id, code] of Object.entries(want)) expect(ROOM_BY_ID[id as RoomId]?.code).toBe(code);
     expect(ROOM_BY_ID.audit_gallery.name).toBe('Audit Gallery'); expect(ROOM_BY_ID.payroll_pensions.name).toBe('Payroll & Pensions Office');
     expect(ROOM_BY_ID.secure_ops.name).toBe('Secure Operations Atrium');
     expect(ROOM_BY_ID.expense_claims.name).toBe('Expense Claims'); expect(ROOM_BY_ID.expense_claims.wing).toBe('finance');
-    expect(ROOMS).toHaveLength(15);
+    expect(ROOM_BY_ID.bcp_command.code).toBe('F1'); expect(ROOM_BY_ID.bcp_command.wing).toBe('command');
+    expect(ROOMS).toHaveLength(16);
   });
   it('is irregular: rooms differ in size, never overlap or touch, and sit in four wings around the atrium', () => {
     expect(new Set(ROOMS.map((r) => `${r.w}x${r.h}`)).size).toBeGreaterThanOrEqual(6);
@@ -33,7 +34,7 @@ describe('facility map', () => {
       const apart = a.x0 + a.w < b.x0 || b.x0 + b.w < a.x0 || a.y0 + a.h < b.y0 || b.y0 + b.h < a.y0;
       expect(apart, `${a.id} and ${b.id} must not touch`).toBe(true);
     }
-    expect(new Set(ROOMS.map((r) => r.wing))).toEqual(new Set(['atrium', 'data', 'finance', 'payments', 'collections']));
+    expect(new Set(ROOMS.map((r) => r.wing))).toEqual(new Set(['atrium', 'data', 'finance', 'payments', 'collections', 'command']));
     const wingOf = (id: RoomId) => ROOM_BY_ID[id].wing;
     expect(['api_gateway', 'event_stream', 'fabric_platform', 'audit_gallery'].map((i) => wingOf(i as RoomId))).toEqual(['data', 'data', 'data', 'data']);
     expect(['finance_core', 'service_payments', 'expense_claims'].map((i) => wingOf(i as RoomId))).toEqual(['finance', 'finance', 'finance']);
@@ -216,8 +217,8 @@ describe('Duplicate Ghost mission logic', () => {
 
 describe('campaign missions', () => {
   it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {
@@ -245,7 +246,7 @@ function runScript(m: ScenarioMission, opts: { skipRecord?: boolean } = {}) {
     for (let i = 0; i < 8 && d.length; i++) {
       const dlg = d.shift();
       if (dlg.type === 'confirm') dlg.onConfirm();
-      else if (dlg.type === 'choice') { const step = m.spec.steps.find((x) => x.choice && x.choice.title === dlg.title); const o = step?.choice?.options.find((x) => x.correct) ?? step!.choice!.options[0]; dlg.onChoose(o.id); }
+      else if (dlg.type === 'choice' || dlg.type === 'meeting') { const step = m.spec.steps.find((x) => (x.choice ?? x.meeting)?.title === dlg.title); const c = (step!.choice ?? step!.meeting)!; const o = c.options.find((x) => x.correct) ?? c.options[0]; dlg.onChoose(o.id); }
       else if (dlg.type === 'timeline' && dlg.onClose) dlg.onClose();
     }
   };
@@ -406,9 +407,9 @@ function teamRun(m: (typeof MISSIONS)[number], o: { team: boolean; autoDecide: b
     run.tick(dt); team.update(dt);
     // a human answering whatever a teammate or a modal asks for
     for (const it of team.inbox) if (!it.resolved && it.kind === 'decision' && o.answer !== false) {
-      const sp = it.spec as any; if (sp.type === 'choice') sp.onChoose(m.bestChoice?.[sp.title] ?? sp.options[0].id); else sp.onConfirm();
+      const sp = it.spec as any; if (sp.type === 'choice' || sp.type === 'meeting') sp.onChoose(m.bestChoice?.[sp.title] ?? sp.options[0].id); else sp.onConfirm();
     }
-    while (modal.length) { const d = modal.shift(); if (d.type === 'choice') d.onChoose(m.bestChoice?.[d.title] ?? d.options[0].id); else if (d.type === 'confirm') d.onConfirm(); else if (d.type === 'timeline' && d.onClose) d.onClose(); }
+    while (modal.length) { const d = modal.shift(); if (d.type === 'choice' || d.type === 'meeting') d.onChoose(m.bestChoice?.[d.title] ?? d.options[0].id); else if (d.type === 'confirm') d.onConfirm(); else if (d.type === 'timeline' && d.onClose) d.onClose(); }
   }
   return { s, team, run };
 }
@@ -540,7 +541,7 @@ import { EQUIPMENT, EQUIPMENT_SPEC, GRAPH_ROOMS, CORRIDORS, DIAGRAMS, PORTS, lay
 describe('facility graph', () => {
   it('lists the 12 core rooms with the specified IDs, names and codes, and every room has a wing', () => {
     const want: Record<string, [string, string]> = { api_gateway: ['A1', 'API Gateway'], event_stream: ['B1', 'Event Stream Hall'], fabric_platform: ['C1', 'Fabric Data Platform'], integration_exchange: ['D1', 'Integration Exchange'], service_payments: ['A2', 'Service Payments'], finance_core: ['B2', 'Finance Core'], payment_orchestration: ['C2', 'Payment Orchestration'], bacs_vault: ['D2', 'BACS Vault'], secure_ops: ['A3', 'Secure Operations Atrium'], card_payments: ['B3', 'Card Payments'], debt_recovery: ['C3', 'Accounts Receivable & Debt Recovery'], agency_handoff: ['D3', 'Agency Hand-off'] };
-    expect(GRAPH_ROOMS.length).toBe(15);
+    expect(GRAPH_ROOMS.length).toBe(16);
     for (const [id, w] of Object.entries(want)) { const r = GRAPH_ROOMS.find((q) => q.id === id)!; expect([r.code, r.name]).toEqual(w); }
     for (const r of GRAPH_ROOMS) expect(r.wing).toBeDefined();
   });
@@ -1012,7 +1013,7 @@ describe('fog of discovery: visited rooms are revealed, the rest are silhouettes
 
 // ---------------------------------------------------------------- Auto keeps going; business-continuity missions ----
 import { settings } from '../src/game/systems/Settings';
-import { BCP_FIRST } from '../src/game/systems/Campaign';
+import { BCP_FIRST, CYBER_FIRST } from '../src/game/systems/Campaign';
 
 describe('Auto keeps going', () => {
   it('Auto makes the calls by default, and Auto-run is opt-in', () => {
@@ -1041,7 +1042,7 @@ describe('Auto keeps going', () => {
 });
 
 describe('business-continuity missions', () => {
-  const bcp = MISSIONS.filter((m) => m.order >= BCP_FIRST);
+  const bcp = MISSIONS.filter((m) => m.order >= BCP_FIRST && m.order < CYBER_FIRST);
   it('adds payments failure, a flood in a room and a request flood, each with a continuity decision and goals', () => {
     expect(bcp.map((m) => m.id)).toEqual(['payments-down', 'rising-water', 'flood-gates']);
     for (const m of bcp) {

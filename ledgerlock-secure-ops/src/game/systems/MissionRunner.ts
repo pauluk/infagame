@@ -10,6 +10,7 @@ import type { GameState } from './GameState';
 /** Optional passes that no mission lists: they open exhibits or maintenance shortcuts, never a required objective. */
 const OPTIONAL_GRANTS: Partial<Record<PassId, { when: (s: GameState) => boolean; hint: string }>> = {
   audit_gallery_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. This pass is optional, and broader than the incident needs.' },
+  bcp_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. The Bronze team convenes once an incident is declared.' },
   expense_audit_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. This pass is optional and broader than the incident needs.' },
   staff_office_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. This pass is optional; access reviews are done at the Identity & Access Desk in the atrium.' },
   maintenance_pass: { when: (s) => !!s.flags.briefed, hint: 'Read the Incident Wall first. The maintenance conduits are optional shortcuts.' },

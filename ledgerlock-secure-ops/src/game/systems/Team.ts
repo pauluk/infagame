@@ -237,6 +237,12 @@ export class TeamController {
         const it = this.inbox[this.inbox.length - 1];
         return true;
       }
+      case 'meeting': {
+        if (auto) { this.postReport(m, spec.title, `${m.name} agreed the best-practice decision with the Bronze team.`); spec.onChoose(mission.bestChoice?.[spec.title] ?? spec.options[0].id); return true; }
+        this.ask(m, spec.title, 'Bronze needs your decision', { ...spec, onChoose: (id) => { it.resolved = true; if (m.pending === it) m.pending = null; spec.onChoose(id); } });
+        const it = this.inbox[this.inbox.length - 1];
+        return true;
+      }
       case 'confirm': {
         if (auto) { this.postReport(m, spec.title, `${m.name} confirmed: ${spec.confirmLabel}.`); spec.onConfirm(); return true; }
         this.ask(m, spec.title, 'Needs your approval', { ...spec, onConfirm: () => { it.resolved = true; if (m.pending === it) m.pending = null; spec.onConfirm(); } });

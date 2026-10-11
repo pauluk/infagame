@@ -10,9 +10,10 @@ import ripple from './rootOfTheRipple';
 import payments from './paymentsDown';
 import water from './risingWater';
 import gates from './floodGates';
+import malware from './quietMalware';
 
 /** Incident Board data per mission. The hub (Operations Floor) has no active incident. */
-export const INCIDENTS: IncidentDef[] = [...duplicateGhost, ...bacs, ...collection, ...tide, ...fabric, ...token, ...restore, ...ripple, ...payments, ...water, ...gates];
+export const INCIDENTS: IncidentDef[] = [...duplicateGhost, ...bacs, ...collection, ...tide, ...fabric, ...token, ...restore, ...ripple, ...payments, ...water, ...gates, ...malware];
 export const INCIDENTS_BY_MISSION: Record<string, IncidentDef[]> = {};
 for (const i of INCIDENTS) (INCIDENTS_BY_MISSION[i.missionId] ??= []).push(i);
 export const INCIDENT_BY_ID = Object.fromEntries(INCIDENTS.map((i) => [i.incidentId, i])) as Record<string, IncidentDef>;

@@ -1,6 +1,6 @@
 import type { ContainmentCfg, Debrief, GoalDef, MissionApi, MissionDef, Recordable, Rule, ScoreInput } from './types';
 import type { GameState } from '../../game/systems/GameState';
-import type { EvidenceDef, PassId, RoomId, ToolId, Tone } from '../../game/types';
+import type { EvidenceDef, MeetingAttendee, PassId, RoomId, ToolId, Tone } from '../../game/types';
 import { PASSES } from '../passes';
 import { propTarget } from '../targets';
 
@@ -18,6 +18,8 @@ export interface StepSpec {
   evidence?: string;
   info?: Info | ((a: MissionApi) => Info);
   choice?: { title: string; body: string | ((a: MissionApi) => string); options: ChoiceOption[] };
+  /** A Bronze meeting: service managers report (live, from the game state) and the team decides together. */
+  meeting?: { title: string; body: string | ((a: MissionApi) => string); attendees: (a: MissionApi) => MeetingAttendee[]; options: (ChoiceOption & { backers?: string[] })[] };
   confirm?: { title: string; body: string; impacts: { label: string; text: string; tone: Tone }[]; confirmLabel?: string };
   say?: [string, string, Tone];
   fx?: 'scan' | 'sparkle' | 'repair';
@@ -78,6 +80,22 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
       if (ev && !a.s.passes.has(ev.requiredPass)) { a.say('Access denied', `${ev.name} needs the ${PASSES[ev.requiredPass].name}.`, 'warn', { hint: true }); return; }
     }
     const info = typeof step.info === 'function' ? step.info(a) : step.info;
+    if (step.meeting) {
+      const c = step.meeting;
+      a.dialog({
+        type: 'meeting', title: c.title, body: typeof c.body === 'function' ? c.body(a) : c.body, attendees: c.attendees(a),
+        options: c.options.map((o) => ({ id: o.id, label: o.label, detail: o.detail, backers: o.backers })),
+        onChoose: (id) => {
+          const o = c.options.find((x) => x.id === id)!;
+          if (o.gain) for (const [k, v] of Object.entries(o.gain)) a.adjust(k as keyof Gain, v as number, o.correct ? undefined : o.label);
+          if (o.hit) a.hit('opt:' + step.id + id, o.hit, o.hitSeconds ?? 45);
+          for (const f of o.flags ?? []) a.flag(f);
+          if (o.completes ?? o.correct) { complete(a, step, target); a.say(o.correct ? 'Agreed at Bronze' : 'Agreed, with a cost', o.result, o.correct ? 'good' : 'warn'); }
+          else { a.data.wrong = (a.data.wrong ?? 0) + 1; a.say('The Bronze team pushes back', o.result + ' You can raise it again.', 'warn', { hint: true }); }
+        },
+      });
+      return;
+    }
     if (step.choice) {
       const c = step.choice;
       a.dialog({
@@ -163,7 +181,7 @@ export function makeScenario(sp: ScenarioSpec): MissionDef {
     }),
     debrief: (s): Debrief => ({ what: sp.debrief.what, response: sp.debrief.response ? sp.debrief.response(s) : ['You worked through the evidence in order, using only read-only, masked access.'], learn: sp.debrief.learn }),
     nextStep: sp.debrief.nextStep,
-    bestChoice: Object.fromEntries(sp.steps.filter((x) => x.choice).map((x) => [x.choice!.title, (x.choice!.options.find((o) => o.correct) ?? x.choice!.options[0]).id])),
+    bestChoice: Object.fromEntries(sp.steps.filter((x) => x.choice || x.meeting).map((x) => { const c = (x.choice ?? x.meeting)!; return [c.title, (c.options.find((o) => o.correct) ?? c.options[0]).id]; })),
   };
   (mission as MissionDef & { script: ScriptAction[]; spec: ScenarioSpec }).script = sp.script;
   (mission as MissionDef & { spec: ScenarioSpec }).spec = sp;

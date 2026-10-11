@@ -25,6 +25,7 @@ room('payroll_pensions', 22, 36, 8, 7);
 room('card_payments', 34, 40, 12, 8);
 room('bacs_vault', 49, 40, 10, 8);
 room('debt_recovery', 63, 40, 10, 8);
+R.bcp_command = { id: 'bcp_command', x: 1, y: 6, w: 12, h: 10, ox: 1, oy: 0 };
 R.expense_claims = { id: 'expense_claims', x: 2, y: 23, w: 10, h: 8, ox: 0, oy: 0 };
 R.audit_gallery.ox = 0; R.audit_gallery.oy = 0; R.payroll_pensions.ox = 0; R.payroll_pensions.oy = 0;
 
@@ -41,6 +42,7 @@ junction('jsw', 'South-West Concourse', 16, 34);
 junction('je', 'East Concourse', 45, 28);
 junction('jne', 'North-East Concourse', 55, 21);
 junction('js', 'South Concourse', 37, 38);
+junction('jbc', 'Command Concourse', -2, 18);
 junction('jse', 'South-East Concourse', 60, 38);
 const L = (id: string, a: string, sa: Side | undefined, b: string, sb: Side | undefined, label: string, kind: LinkKind = 'main'): Lk => ({ id, a, sa, b, sb, kind, label });
 const LINKS: Lk[] = [
@@ -60,7 +62,8 @@ const LINKS: Lk[] = [
   L('es-api', 'event_stream', 'n', 'api_gateway', 'n', 'Conduit shortcut (Event Stream to API Gateway)', 'maintenance'),
   L('es-audit', 'event_stream', 'w', 'audit_gallery', 'e', 'Gallery approach'), L('api-ix', 'api_gateway', 'e', 'integration_exchange', 'w', 'Gateway link'),
   L('ix-agency', 'integration_exchange', 's', 'agency_handoff', 'n', 'Courier lift (Integration Exchange to Agency Hand-off)', 'maintenance'),
-  L('jnw-exp', 'jnw', undefined, 'expense_claims', 'n', 'Claims branch'), L('exp-fc', 'expense_claims', 'e', 'finance_core', 'w', 'Claims to ledger'),
+  L('jnw-jbc', 'jnw', undefined, 'jbc', undefined, 'Command spine'), L('jbc-bcp', 'jbc', undefined, 'bcp_command', 's', 'Command branch'), L('jbc-exp', 'jbc', undefined, 'expense_claims', 'n', 'Claims branch'),
+  L('bcp-audit', 'bcp_command', 'e', 'audit_gallery', 'w', 'Command to gallery'), L('exp-fc', 'expense_claims', 'e', 'finance_core', 'w', 'Claims to ledger'),
   L('fc-sp', 'finance_core', 's', 'service_payments', 'n', 'Service walk'), L('sp-pp', 'service_payments', 'e', 'payroll_pensions', 'w', 'Staff corridor'),
   L('sp-card', 'service_payments', 'e', 'card_payments', 'w', 'Back-office shortcut (Service Payments to Card Payments)', 'maintenance'),
   L('card-bacs', 'card_payments', 'e', 'bacs_vault', 'w', 'Rails corridor'), L('bacs-debt', 'bacs_vault', 'e', 'debt_recovery', 'w', 'Service tunnel'), L('agency-debt', 'agency_handoff', 's', 'debt_recovery', 'n', 'Recovery walk'),

@@ -33,6 +33,8 @@ const fresh = (): CampaignData => ({ version: 1, missions: {}, measures: { ...BA
 /** Campaign progress lives only in this browser's localStorage. It never stores finance data or credentials (all of it is synthetic). */
 /** First mission of the business-continuity track (orders 9 to 11). */
 export const BCP_FIRST = 9;
+/** First mission of the cyber track (orders 12 to 14), also open after the tutorial. */
+export const CYBER_FIRST = 12;
 export class Campaign {
   data: CampaignData = fresh();
   constructor(private storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null = typeof localStorage !== 'undefined' ? safeStorage() : null) { this.load(); }
@@ -49,7 +51,7 @@ export class Campaign {
     if (this.data.unlockedAll) return true;
     if (m.order === 0) return this.isCompleted('duplicate-ghost');
     if (m.order <= 1) return true;
-    if (m.order === BCP_FIRST) return this.isCompleted('duplicate-ghost');      // the business-continuity track opens after the tutorial
+    if (m.order === BCP_FIRST || m.order === CYBER_FIRST) return this.isCompleted('duplicate-ghost');      // the business-continuity track opens after the tutorial
     const prev = all.find((x) => x.order === m.order - 1);
     return !prev || this.isCompleted(prev.id);
   }

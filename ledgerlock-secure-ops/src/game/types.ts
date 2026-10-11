@@ -4,7 +4,7 @@ export type RoomId =
   | 'api_gateway' | 'event_stream' | 'fabric_platform' | 'integration_exchange'
   | 'service_payments' | 'finance_core' | 'payment_orchestration' | 'bacs_vault'
   | 'secure_ops' | 'card_payments' | 'debt_recovery' | 'agency_handoff'
-  | 'audit_gallery' | 'payroll_pensions' | 'expense_claims';
+  | 'audit_gallery' | 'payroll_pensions' | 'expense_claims' | 'bcp_command';
 
 export type ExternalId = 'bank_sim' | 'card_network_sim' | 'agency_sim' | 'reporting_display';
 
@@ -12,9 +12,12 @@ export type PassId =
   | 'ops_pass' | 'service_audit_pass' | 'api_audit_pass' | 'payments_audit_pass' | 'event_trace_pass'
   | 'ledger_read_pass' | 'payment_ops_pass' | 'bacs_audit_pass' | 'debt_read_pass'
   | 'agency_audit_pass' | 'fabric_observer_pass' | 'integration_audit_pass'
-  | 'audit_gallery_pass' | 'staff_office_pass' | 'expense_audit_pass'
+  | 'audit_gallery_pass' | 'staff_office_pass' | 'expense_audit_pass' | 'bcp_pass'
   | 'maintenance_pass' | 'courier_pass'   // open optional maintenance shortcuts, never a required route
   | 'token_rotation_pass';        // special: time-limited rotation approval (opens no door)
+
+/** A service manager at the Bronze table: who they are, how their service is doing and what they say. */
+export interface MeetingAttendee { name: string; role: string; service: string; status: 'ok' | 'warn' | 'bad'; says: string }
 
 export type Side = 'n' | 'e' | 's' | 'w';
 export interface Cell { x: number; y: number }
@@ -98,6 +101,7 @@ export type DialogSpec =
   | { type: 'confirm'; title: string; body: string; why?: string; impacts: Impact[]; confirmLabel: string; onConfirm: () => void }
   | { type: 'timeline'; title: string; steps: { time: string; text: string; tone: Tone }[]; conclusion: string; onClose?: () => void }
   | { type: 'choice'; title: string; body: string; options: { id: string; label: string; detail: string }[]; onChoose: (id: string) => void }
+  | { type: 'meeting'; title: string; body: string; attendees: MeetingAttendee[]; options: { id: string; label: string; detail: string; backers?: string[] }[]; confirmLabel?: string; onChoose: (id: string) => void }
   | { type: 'info'; title: string; body: string; rows?: [string, string][]; compare?: { before: [string, string][]; after: [string, string][] } }
   | { type: 'alert' }
   | { type: 'access'; readerRoom?: RoomId; door?: string }
