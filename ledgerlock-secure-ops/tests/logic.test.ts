@@ -217,8 +217,8 @@ describe('Duplicate Ghost mission logic', () => {
 
 describe('campaign missions', () => {
   it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'blue-lantern', 'blue-lantern-gap', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'blue-lantern', 'blue-lantern-gap', 'bau-opening-checks', 'bau-payment-run', 'bau-month-end', 'bau-leavers-joiners', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {
@@ -585,7 +585,7 @@ describe('incident board data', () => {
     expect(new Set(INCIDENTS.map((i) => i.puzzleType))).toEqual(new Set(['cable', 'match', 'missing', 'verify']));
     for (const m of MISSIONS) {
       const defs = INCIDENTS_BY_MISSION[m.id] ?? [];
-      if (m.order > 0 && !m.id.startsWith('blue-lantern')) expect(defs.length, m.id).toBeGreaterThanOrEqual(3);
+      if (m.order > 0 && !m.id.startsWith('blue-lantern') && !m.id.startsWith('bau-')) expect(defs.length, m.id).toBeGreaterThanOrEqual(3);
       const ids = new Set(playbookFor(m).map((a) => a.id)), goals = new Set(m.goals.map((g) => g.id)), ev = new Set(m.evidence.map((e) => e.id));
       for (const d of defs) {
         const w = `${d.incidentId} (${m.id})`;

@@ -24,7 +24,7 @@ let locked = await page.$$eval('.mcard.locked', (e) => e.length);
 if (locked !== 0) await fail('every mission should be open, got ' + locked + ' locked');
 const goalText = await page.textContent('#screens');
 for (const t of ['Service Confidence', 'Precision Over Panic', 'Least Privilege', 'No Lost Events', 'Ledger Listener', 'Clean Restore', 'Good Evidence', 'The Root of the Ripple', 'Payments Down', 'Rising Water', 'Flood Gates', 'Between missions']) if (!goalText.includes(t)) await fail('mission select missing: ' + t);
-ok('mission select shows campaign goal, Service Confidence, 6 badges, 17 missions (all open) and the side-task hub');
+ok('mission select shows campaign goal, Service Confidence, 6 badges, 21 missions (all open) and the side-task hub');
 if (SHOTS) await page.screenshot({ path: SHOTS + '/c1-select.png' });
 page.once('dialog', (d) => d.accept());
 await page.click('button[data-a=unlock]'); await page.waitForTimeout(300);
