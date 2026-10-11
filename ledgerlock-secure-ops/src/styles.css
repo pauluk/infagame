@@ -328,3 +328,15 @@ body.team-open #passes, body.team-open #legend { display: none; }
 .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; } .rule { display: grid; grid-template-columns: 40px 1fr; gap: 8px; background: #132136; border-radius: 10px; padding: 8px 10px; } .rule b { font-size: 1.1em; color: var(--coral); } .rule h4 { margin: 0 0 3px; } .rule p { margin: 2px 0; } .safe { color: var(--mint); } .rolegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; } .scroll { overflow: auto; } .ar .t td, .ar .t th { padding: 4px 8px; vertical-align: top; }
 @media (max-width: 900px) { .ar-body { grid-template-columns: 1fr; grid-template-rows: 150px minmax(0, 1fr); } .ar-queue { flex-direction: row; overflow-x: auto; } .qitem { min-width: 190px; } .builder, .compare { grid-template-columns: 1fr; } .passport { grid-template-columns: 84px 1fr; } .pbar { grid-template-columns: 1fr 1fr 50px; } }
 @media (max-width: 560px) { .pcard, .act, .qitem, .ar button { min-height: 48px; } }
+
+/* ---- facility graph: door states, concourses, fog ---- */
+.doorstate { margin: 8px 0; padding: 8px 10px; border-radius: 8px; border-left: 5px solid #009E73; background: rgba(0, 158, 115, .12); }
+.doorstate.locked { border-left-color: #E69F00; background: rgba(230, 159, 0, .12); }
+.doorstate.sealed { border-left-color: #D55E00; background: rgba(213, 94, 0, .14); }
+.doorstate.disabled { border-left-color: #9aa5b8; border-left-style: dotted; background: rgba(154, 165, 184, .12); }
+.bp-side dd { text-align: left; }
+.bp-side dd .link { text-align: left; display: inline; }
+.bp-door { cursor: pointer; }
+.bp-door:focus-visible, .bp-corr:focus-visible, .bp-room:focus-visible { outline: 3px solid #F3F6FA; outline-offset: 2px; }
+.bp-room.unknown { cursor: pointer; }
+.bp-corr { cursor: pointer; }

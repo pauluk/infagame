@@ -43,7 +43,7 @@ if (!txt.includes('step 2 of') || !txt.includes('Payments Audit Pass')) await fa
 ok('coach advances after the step is done');
 await walkNear('prop:secure_ops.access_desk'); await S('(sc,t)=>sc.selectTarget(t)', 'prop:secure_ops.access_desk'); await key('e');
 await page.click('#dialog button[data-req=payments_audit_pass]'); await page.waitForTimeout(200); await page.click('#dialog button[data-a=ok]');
-await S('(sc)=>sc.walkTo({x: 25, y: 32})');
+await S('(sc)=>sc.walkTo(sc.__cell("room:card_payments"))');
 for (let i = 0; i < 160 && !(await S('(sc)=>!!sc.state.flags.visited_card_payments')); i++) await page.waitForTimeout(150);
 await page.waitForTimeout(300);
 await key('2'); await page.waitForTimeout(300);   // the scanner is the default tool, so pick another to see the prompt

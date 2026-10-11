@@ -1,26 +1,68 @@
 # Map, corridors, doors and access
 
-All of this is data: `src/data/map.ts` (rooms, doors, readers, grid), `src/data/passes.ts` (pass access map), `src/data/routes.ts` (routes), `src/data/evidence.ts` (tutorial evidence). Mission logic, route overlays, room interactions and the minimap all use the same stable IDs.
+The facility is an **explicit graph**. Rooms and corridor junctions are nodes, corridors are edges, and every door belongs to exactly one corridor. The walk grid, the minimap, the in-game doors and readers, the Facility Map, the incident markers and the system overlays are all generated from the same data, so they cannot disagree.
 
-## Grid
+| File | What it holds |
+|---|---|
+| `src/data/layout.ts` | **Generated, then committed as data.** Room rectangles, corridor junctions ("concourses"), and every link with its door cells, reader cell and corridor rectangles. Nothing is inferred from screen position. |
+| `src/data/rooms.ts` | Room specs (id, code, name, wing, props) and the workstation bays. |
+| `src/data/map.ts` | Builds `ROOMS`, `DOORS`, `GRID`, the door-state model (`doorInfo`, `linkInfo`, `LINK_RULES`, `GATE`) and `isWalkable`. |
+| `src/data/facilityGraph.ts` | The graph API: `CORRIDORS`, `neighbours`, `nodeRoute`, `LOOPS`, `locate`, equipment, ports, system diagrams. |
+| `src/game/systems/Fog.ts` | What the player has discovered (`isKnown`). |
+| `tools/layout-lab.mts` | The authoring tool that places doors clear of props, routes 2-wide corridors that never touch another link, and emits `layout.ts` (`npx vite-node tools/layout-lab.mts --emit`). |
 
-`screenX = originX + (gridX - gridY) * 48 / 2`, `screenY = originY + (gridX + gridY) * 24 / 2` (`src/game/systems/Grid.ts`). Sprites are depth-sorted by `gridX + gridY` of their ground point. Rooms are 10 x 8 cells (the outer ring is wall; interior 8 x 6). Corridors are 2 cells wide and surround every room, so corridors are continuous. World size 64 x 46 cells.
+## Layout
 
-## Rooms
+World 78 x 57 cells; projection `screenX = originX + (gx - gy) * 24`, `screenY = originY + (gx + gy) * 12` (`Grid.ts`). Fourteen rooms of **different sizes** (6 x 9 up to 14 x 12) sit in an irregular arrangement around the central **Secure Operations Atrium**, joined by short corridors (2 cells wide) and eight **concourses** (4 x 4 open plazas where corridors meet). The map only shows corridors that exist: there is no continuous floor around the rooms.
 
-`api_gateway A1`, `event_stream B1`, `fabric_platform C1`, `integration_exchange D1`, `service_payments A2`, `finance_core B2`, `payment_orchestration C2`, `bacs_vault D2`, `secure_ops A3`, `card_payments B3`, `debt_recovery C3`, `agency_handoff D3`. Props per room are listed in `SPECS` in `map.ts` (e.g. B1: queue monitor, replay diagnostic console, replay buffer, event lanes).
+Wings (the twelve core rooms keep their ids and codes; workstations are small bays inside system rooms, not rooms):
 
-## Physical connections (17)
+| Wing | Rooms |
+|---|---|
+| Atrium | `secure_ops` A3 Secure Operations Atrium: spawn, Incident Wall (Incident Board), Facility Overview Terminal, Access Desk, **Identity & Access Desk**. Five exits. |
+| Data | `api_gateway` A1, `event_stream` B1, `fabric_platform` C1, `audit_gallery` E1 (read-only gallery) |
+| Finance operations | `finance_core` B2 (Accounting and AP workstations), `service_payments` A2 |
+| Payment rails | `payment_orchestration` C2 (Treasury workstations), `card_payments` B3 (Fraud workstation), `bacs_vault` D2, `integration_exchange` D1 |
+| Collections and staff | `debt_recovery` C3 (AR workstations), `agency_handoff` D3 (Fraud workstation), `payroll_pensions` E2 (Payroll & Pensions office) |
 
-Door pairs: east/west (A1-B1, B1-C1, C1-D1, A2-B2, B2-C2, C2-D2, A3-B3, B3-C3, C3-D3) and north/south (A1-A2, B1-B2, C1-C2, D1-D2, A2-A3, B2-B3, C2-C3, D2-D3). Each connection gives one 2-cell door in each room, opening onto the corridor between them. The test suite asserts all 17 pairs and that every door is reachable through corridors holding only the `ops_pass`.
+## The graph
+
+* **Concourse links.** Each room opens onto at least one concourse. Concourses are open ground, so reaching a room never means walking *through* a locked room. The test suite asserts every concourse door is reachable holding only the `ops_pass`, and that every room is reachable from the atrium without crossing another room.
+* **Direct links** join two rooms and form the required loops (walking one means crossing the room at the far end, so it needs that room's pass).
+* **Loops** (`LOOPS` in `facilityGraph.ts`, each asserted to be a real cycle): Operations (atrium, Finance Core, Event Stream, Fabric), Data (Event Stream, Fabric, API Gateway, closed by the Event Stream to API Gateway **cross-link**), Payment (atrium, Card Payments, BACS Vault, Payment Orchestration), Collections (Payment Orchestration, Agency Hand-off, Debt Recovery, BACS Vault), Staff access (atrium, Payroll & Pensions, Service Payments, Finance Core).
+* **Optional maintenance corridors** (three), never needed for any objective: the *conduit shortcut* (Event Stream to API Gateway; starts locked until the Maintenance Pass), the *courier lift* (Integration Exchange to Agency Hand-off; needs a Courier Approval and is sealed during an incident there) and the *back-office shortcut* (Service Payments to Card Payments; temporarily disabled for the first six game minutes and sealed during incidents in either room).
+* **A blocked door never strands an objective.** Only maintenance corridors can be sealed, disabled or locked, and the tests assert that with every one of them blocked, every room, start room, incident room and evidence room of every mission is still reachable.
+
+## Doors
+
+A door has one of four states, always with a reason (and the pass or approval it needs):
+
+| State | Shown as | Meaning |
+|---|---|---|
+| open | green circle, "Open" | You can walk through. |
+| locked | orange square, "Locked" | Needs a pass: the room's own pass, or for a maintenance corridor the Maintenance Pass or Courier Approval. |
+| incident-sealed | red diamond, "Sealed by incident" | An uncontained incident beside the corridor's rooms has sealed it (optional corridors only). Contain the incident to reopen. |
+| temporarily disabled | grey dotted square, "Temporarily disabled" | Scheduled maintenance; it returns by itself. |
+
+The state is computed by `doorInfo(door, passes)` (corridor first, then the room's pass), used by `isWalkable`, the scene's door and reader sprites, the minimap, the Facility Map and the reader dialog. Door ids are stable: `door:<room>.<neighbour>`, for example `door:card_payments.js` (the south concourse). The legend uses shapes and words as well as colour (Okabe-Ito palette).
+
+## Discovery
+
+Visited rooms are revealed. So are your start room, the incident room (the wall names it), and rooms where you collected evidence. Everything else is drawn as a dark **silhouette** with no name or equipment, in the game, the minimap and the map.
+
+## Map views
+
+Press <kbd>B</kbd> (or use the Facility Overview Terminal in the atrium): **Facility** (rooms, corridors, doors, loop highlight), **Systems** (data flows, kept separate from corridors), **Access** (the pass each room needs, door states, workstation bays) and **Incident** (incident room, evidence rooms, the corridor route to it, or the same incident on a system diagram), plus the per-room **Room blueprint**. Select a room, a door or a corridor for its details; **Set waypoint** walks you there (never a teleport).
 
 ## Access readers and passes
 
-Every room is restricted. A door cell is walkable only if the player holds that room's pass; interiors are only reachable through doors, so **a locked room never blocks corridor travel** and there is no bypass mechanic. An access reader on the wall beside each door shows the required pass, its scope, the lock state and a *Request* button.
+Every room is restricted. A door cell is walkable only if the player holds that room's pass; **a locked room never blocks travel between rooms** (concourses are open ground) and there is no bypass mechanic. An access reader on the wall beside each door shows the required pass, its scope, the lock state and a *Request* button.
 
 | Room | Pass | Scope |
 |---|---|---|
 | secure_ops | ops_pass | Control Room and common corridors |
+| audit_gallery | audit_gallery_pass | Read-only access to the audit exhibits (optional) |
+| payroll_pensions | staff_office_pass | Escorted entry to the Payroll & Pensions office (optional) |
 | service_payments | service_audit_pass | Read-only, masked payment-request evidence |
 | api_gateway | api_audit_pass | Read-only request and authentication metadata |
 | card_payments | payments_audit_pass | Read-only, masked card-receipt evidence |
@@ -33,7 +75,7 @@ Every room is restricted. A door cell is walkable only if the player holds that 
 | fabric_platform | fabric_observer_pass | Read-only synthetic Bronze/Silver/Gold pipeline status |
 | integration_exchange | integration_audit_pass | Read-only transfer status and routing metadata |
 
-Passes can also be **revoked** from the Access Desk (least privilege; raises Data protection). Mission 6 adds one special pass, `token_rotation_pass`: a time-limited approval (12 game minutes) that opens no door and is needed to rotate the simulated token at the Access Desk. Requesting a pass a mission does not need costs Data protection.
+Two further passes open optional corridors only and never cost Data protection: `maintenance_pass` and `courier_pass`. Passes can also be **revoked** from the Access Desk (least privilege; raises Data protection). Mission 6 adds one special pass, `token_rotation_pass`: a time-limited approval (12 game minutes) that opens no door and is needed to rotate the simulated token at the Access Desk. Requesting a pass a mission does not need costs Data protection.
 
 Passes are fictional, mission-scoped and read-only; `GameState.passes` is created per mission, so they expire when the mission ends. A request is granted only when the mission's `passGrants` rule says current evidence justifies it; otherwise the player sees a denial and a hint. Evidence retrieval also checks the pass, so nothing can be read remotely.
 
@@ -43,4 +85,4 @@ Passes are fictional, mission-scoped and read-only; `GameState.passes` is create
 
 ## Minimap
 
-Rooms with codes, open/locked doors, the player, available corridors, held passes (chips), the active incident route, and corridor guides. Clicking a room highlights the corridor path (and stops at the door if the room is locked) without teleporting. Camera follow, zoom limits and "Return to player" are in the HUD.
+Rooms with codes, door states (circle open, square locked, diamond sealed, hollow square disabled), the player, undiscovered rooms as silhouettes, held passes (chips), the active incident route, and corridor guides. Clicking a room highlights the corridor path (and stops at the door if the room is locked) without teleporting. Camera follow, zoom limits and "Return to player" are in the HUD.

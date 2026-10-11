@@ -26,7 +26,7 @@ const drag = async (from, to) => {
   await page.waitForTimeout(150);
 };
 
-await page.addInitScript(() => { try { localStorage.setItem('ledgerlock.settings.v1', JSON.stringify({ reducedMotion: true })); } catch { /* ignore */ } });
+await page.addInitScript(() => { try { localStorage.setItem('ledgerlock.settings.v1', JSON.stringify({ reducedMotion: true })); localStorage.setItem('ledgerlock.campaign.v1', JSON.stringify({ version: 1, unlockedAll: true })); } catch { /* ignore */ } });
 await page.goto(URL);
 await page.waitForSelector('button[data-a=start]', { timeout: 20000 });
 await page.click('button[data-a=start]');
