@@ -1,0 +1,66 @@
+import type { IncidentDef } from './types';
+
+const base = { missionId: 'worm-in-the-wires', kanbanStatus: 'new' as const };
+
+const list: IncidentDef[] = [
+  { ...base, incidentId: 'INC-1401', title: 'How did the virus get in and where is it going?', severity: 'High', sourceRoom: 'service_payments', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_attach'],
+    evidenceNotes: { ev_attach: 'invoice_7731.xls.exe copies itself to shared folders every five minutes. Three users opened it. There is no known signature.' },
+    keyObjective: 'Report the entry point and the path to Bronze',
+    prompt: 'Match each fact to what it tells you. One card is a guess.',
+    puzzleType: 'match',
+    puzzlePieces: { type: 'match',
+      slots: [{ id: 's_in', label: 'How it got in', detail: 'The entry point' }, { id: 's_how', label: 'How it spreads', detail: 'The mechanism' }, { id: 's_next', label: 'What it threatens next', detail: 'The risk' }, { id: 's_gap', label: 'Why the filter missed it', detail: 'The control gap' }],
+      pieces: [
+        { id: 'p_mail', label: '212 emails carried the same attachment', detail: 'Filter log', shape: 'square', why: 'Email is the way in.' },
+        { id: 'p_copy', label: 'It copies itself to shared folders every 5 minutes', detail: 'Attachment analysis', shape: 'hex', why: 'That is how a virus spreads without anyone clicking.' },
+        { id: 'p_pay', label: 'The payroll workstation is on its path', detail: 'Host list', shape: 'circle', why: 'The 11:00 payroll file is the thing most at risk.' },
+        { id: 'p_sig', label: 'No signature and double extensions are allowed', detail: 'Filter log', shape: 'diamond', why: 'The filter had nothing to match and allowed .xls.exe.' },
+        { id: 'p_state', label: 'A foreign government is behind it', detail: 'Guess', shape: 'triangle', why: 'Nothing in the evidence says who sent it. Do not report guesses.' }] },
+    correctMatches: { p_mail: 's_in', p_copy: 's_how', p_pay: 's_next', p_sig: 's_gap' },
+    hintText: ['Report what the evidence shows, not who you suspect.', 'The filter log explains the way in and the gap.', 'The host list shows the path to payroll.'],
+    clueOrder: ['ev_attach'],
+    failureFeedback: { default: 'Match each fact: the way in, the mechanism, the next target and the control gap.' },
+    successFeedback: 'The entry point and path are reported and Bronze backs a narrow clean-up.',
+    actions: ['step:bronze_open'], requiredObjectives: ['p4'] },
+
+  { ...base, incidentId: 'INC-1402', title: 'Isolate the segment and close the gap', severity: 'High', sourceRoom: 'payroll_pensions', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_spread'],
+    evidenceNotes: { ev_spread: 'SP-03, SP-09 and PP-02 are infected. The payroll file share is next. The rest of the office is clean.' },
+    keyObjective: 'Contain the segment and block the attachment',
+    prompt: 'Compare what a narrow response expects with the current state. Mark every line that is missing or out of place, then submit.',
+    puzzleType: 'missing',
+    puzzlePieces: { type: 'missing', expectedTitle: 'A narrow response expects', currentTitle: 'Current state', items: [
+      { id: 'seg', label: 'The infected segment', expected: 'Isolated from the network', current: 'Still connected: copies appear every 5 minutes', problem: 'While connected it keeps copying itself towards payroll.', okWhy: '' },
+      { id: 'sig', label: 'The mail filter', expected: 'Blocks the attachment and double extensions', current: 'Delivers it', problem: 'Without a rule, more copies can arrive and be opened.', okWhy: '' },
+      { id: 'rest', label: 'The rest of the office', expected: 'In service', current: 'In service', okWhy: 'It shows no sign of infection: shutting it down would stop valid work.' },
+      { id: 'payroll', label: 'The payroll plan', expected: 'A clean path for the 11:00 file', current: 'Planned: a clean laptop with two-person review', okWhy: 'The plan keeps payroll away from the infected hosts.' }] },
+    hintText: ['Read each line: does Current match Expected?', 'Two lines do not match: the segment and the filter.', 'Leave the rest of the office and the payroll plan alone.'],
+    clueOrder: ['ev_spread'],
+    failureFeedback: { default: 'Compare Expected with Current line by line.' },
+    successFeedback: 'The segment is isolated and the filter now blocks the attachment.',
+    actions: ['contain:isolate'], fixActions: ['step:signature'], requiredObjectives: ['p5'], containTarget: 'prop:payroll_pensions.payroll_console' },
+
+  { ...base, incidentId: 'INC-1403', title: 'Prove the virus is gone and payroll is safe', severity: 'Medium', sourceRoom: 'payroll_pensions', affectedRouteIds: ['service_payment_intake'],
+    evidenceIds: ['ev_filter'],
+    evidenceNotes: { ev_filter: 'The filter delivered 212 messages. 209 were unopened and can be quarantined. Three were opened.' },
+    keyObjective: 'Confirm the clean-up is complete',
+    prompt: 'Choose only the evidence that proves the virus is gone.',
+    puzzleType: 'verify',
+    puzzlePieces: { type: 'verify',
+      before: [['Infected hosts', '3'], ['New copies per 5 minutes', '1']],
+      after: [['Infected hosts', '0'], ['New copies', 'None for 10 minutes']],
+      cards: [
+        { id: 'c1', label: 'A sweep with the new signature finds no copies on any host', detail: 'Sweep result', confirms: true, why: 'Every host was checked against the known file.' },
+        { id: 'c2', label: 'No new copies in the shared folders for ten minutes', detail: 'Folder log', confirms: true, why: 'It is no longer spreading.' },
+        { id: 'c3', label: 'The three hosts match the signed clean image', detail: 'Image check', confirms: true, why: 'They were rebuilt, not just scanned.' },
+        { id: 'x1', label: 'Nobody has reported a problem since 09:30', detail: 'Helpdesk', confirms: false, why: 'Silence is not evidence.' },
+        { id: 'x2', label: 'The payroll file was sent', detail: 'Payroll', confirms: false, why: 'Good for the deadline but not proof of a clean network.' },
+        { id: 'x3', label: 'The all-staff notice went out', detail: 'Comms', confirms: false, why: 'Communication is not verification.' }] },
+    hintText: ['Proof is a check you can repeat.', 'A sweep, a quiet folder and a rebuilt image tell the story.', 'Silence and notices are not proof.'],
+    clueOrder: ['ev_filter'],
+    failureFeedback: { default: 'Choose only checks you can repeat: sweep, folder log, image.' },
+    successFeedback: 'The virus is gone, the hosts are clean and payroll is safe.',
+    actions: ['step:verify'], requiredObjectives: ['p8'] },
+];
+export default list;

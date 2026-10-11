@@ -76,6 +76,9 @@ Turn on **JEV** in Settings (it needs `TYPESAFE_API_KEY` on the server) to ask T
 ### Business-continuity missions
 Missions 9 to 11 (open after the tutorial): **Payments Down** (a payment run cannot reach the bank before payroll), **Rising Water** (a flood in the Event Stream Hall: safety first, fail over, rebuild, fail back) and **Flood Gates** (a flood of requests at the API Gateway). See `docs/bcp-missions.md`.
 
+### Cyber missions and the BCP Command Centre
+Missions 12 to 14 (open after the tutorial): **Quiet Malware**, **Ransom Note** and **Worm in the Wires**. The manager reports to the Bronze team in the **BCP Command Centre**, hears from the service managers, takes decisions together and agrees communications. See `docs/cyber-missions.md`.
+
 ## Facility map
 
 An irregular layout of **15 rooms** of different sizes (the twelve core rooms plus an Audit Gallery, a Payroll & Pensions office and an Expense Claims service room) around a central **Secure Operations Atrium**, joined by short corridors and eight corridor concourses. It is an explicit graph with stable room ids: movement, the minimap, doors, readers, incident markers and the map views all read the same data (`src/data/layout.ts`; see `docs/map-and-access.md`).

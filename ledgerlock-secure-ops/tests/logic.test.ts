@@ -217,8 +217,8 @@ describe('Duplicate Ghost mission logic', () => {
 
 describe('campaign missions', () => {
   it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {
