@@ -79,7 +79,7 @@ Missions 9 to 11 (open after the tutorial): **Payments Down** (a payment run can
 ### Cyber missions and the BCP Command Centre
 Missions 12 to 14 (open after the tutorial): **Quiet Malware**, **Ransom Note** and **Worm in the Wires**. The manager reports to the Bronze team in the **BCP Command Centre**, hears from the service managers, takes decisions together and agrees communications. See `docs/cyber-missions.md`.
 
-Missions 17 to 20 are **business-as-usual** shifts (Opening Checks, Payment Run Day, Month-End Close, Leavers and Joiners): no outage, just careful checking and one judgement call each. See `docs/bau-missions.md`.
+Missions 17 to 25 are **business-as-usual** shifts (Opening Checks, Payment Run Day, Month-End Close, Leavers and Joiners and five more): no outage, just careful checking and one judgement call each. See `docs/bau-missions.md`.
 
 Select a teammate (click them on the map or in the Team panel) to give orders: click the floor or the minimap to send them somewhere, or click a component to give them a job.
 

@@ -367,3 +367,6 @@ body.team-open #passes, body.team-open #legend { display: none; }
 .bl { background: #0b1626; } .bl .pcard select { width: 100%; max-width: 100%; box-sizing: border-box; } .bl .zone { min-width: 0; } .bl .bl-who select { width: auto; }
 
 #team .tm[role=button] { cursor: pointer; } #team .tm.sel { outline: 3px solid #fff; background: #1b3558; }
+
+.bl .bl-tray { display: flex; flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 7px; min-height: 0; padding: 6px 8px; } .bl .bl-tray h4 { flex: 0 0 100%; } .bl .bl-tray .pcard { flex: 1 1 210px; min-height: 0; } .bl .bl-tray .empty { flex: 1 1 100%; }
+.bl .zone { min-height: 90px; }

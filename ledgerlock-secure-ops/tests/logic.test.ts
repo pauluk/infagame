@@ -217,8 +217,8 @@ describe('Duplicate Ghost mission logic', () => {
 
 describe('campaign missions', () => {
   it('has the tutorial, seven further campaign missions, the three business-continuity missions in order, and the side-task hub', () => {
-    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'blue-lantern', 'blue-lantern-gap', 'bau-opening-checks', 'bau-payment-run', 'bau-month-end', 'bau-leavers-joiners', 'ops-floor']);
-    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+    expect(MISSIONS.map((m) => m.id)).toEqual(['duplicate-ghost', 'bacs-after-dark', 'collection-connection', 'event-stream-tide', 'fabric-mirror', 'token-on-the-table', 'clean-restore', 'root-of-the-ripple', 'payments-down', 'rising-water', 'flood-gates', 'quiet-malware', 'ransom-note', 'worm-in-the-wires', 'blue-lantern', 'blue-lantern-gap', 'bau-opening-checks', 'bau-payment-run', 'bau-month-end', 'bau-leavers-joiners', 'bau-bank-rec', 'bau-chargebacks', 'bau-supplier-onboarding', 'bau-certificate-watch', 'bau-agency-placement', 'ops-floor']);
+    expect(MISSIONS.filter((m) => m.order > 0).map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
   });
   it('every mission has primary, optional and stretch goals (hub: optional + stretch), evidence sources and a debrief', () => {
     for (const m of MISSIONS) {

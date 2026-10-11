@@ -47,10 +47,25 @@ export function enableDrag(root: HTMLElement, spec: DragSpec): void {
     }
     if (s.ghost) { s.ghost.style.left = e.clientX - 20 + 'px'; s.ghost.style.top = e.clientY - 20 + 'px'; }
     if (s.line) { const r = s.h.getBoundingClientRect(), ln = s.line.firstChild as SVGLineElement; ln.setAttribute('x1', String(r.left + r.width)); ln.setAttribute('y1', String(r.top + r.height / 2)); ln.setAttribute('x2', String(e.clientX)); ln.setAttribute('y2', String(e.clientY)); }
+    autoScroll(e.clientX, e.clientY);
     const t = under(e.clientX, e.clientY);
     if (t !== s.hover) { s.hover?.classList.remove('drop-hover'); t?.classList.add('drop-hover'); s.hover = t; }
     e.preventDefault();
   });
+  /** While dragging near the top or bottom edge of a scrolling panel, scroll it so drop targets that are off screen can be reached. */
+  const autoScroll = (x: number, y: number) => {
+    let el = document.elementFromPoint(x, y) as HTMLElement | null;
+    while (el && el !== document.body) {
+      const st = getComputedStyle(el);
+      if ((st.overflowY === 'auto' || st.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 2) {
+        const r = el.getBoundingClientRect(), edge = 70;
+        if (y > r.bottom - edge) el.scrollTop += Math.min(24, (y - (r.bottom - edge)) / 3 + 4);
+        else if (y < r.top + edge) el.scrollTop -= Math.min(24, ((r.top + edge) - y) / 3 + 4);
+        return;
+      }
+      el = el.parentElement;
+    }
+  };
   const finish = (e: PointerEvent, cancel: boolean) => {
     if (!s || e.pointerId !== s.id) return;
     const wasDrag = s.drag, h = s.h, t = wasDrag && !cancel ? under(e.clientX, e.clientY) : null;
