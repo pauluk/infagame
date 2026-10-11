@@ -24,6 +24,7 @@ import { TeamPanel } from './teamPanel';
 import { BlueprintView } from './blueprint';
 import { IncidentBoardView } from './incidentBoard';
 import { AccessReviewView } from './accessReview';
+import { BlueLanternView } from './blueLantern';
 import { IncidentBoard } from '../game/systems/Incidents';
 import { jev, type JevChoice } from '../integrations/jev/JevClient';
 import type { FabricSnapshot } from '../integrations/fabric';
@@ -48,6 +49,7 @@ export class UI {
   blueprint: BlueprintView | null = null;
   board: IncidentBoardView | null = null;
   access: AccessReviewView | null = null;
+  blue: BlueLanternView | null = null;
   private panelOpen: string | null = null;
   private dirty = false;
   private mmTimer = 0;
@@ -134,7 +136,7 @@ export class UI {
     const card = (m: (typeof MISSIONS)[number]) => {
       const rec = campaign.data.missions[m.id]; const unlocked = campaign.isUnlocked(m, MISSIONS);
       const prim = m.goals.filter((g) => g.kind === 'primary'), opt = m.goals.filter((g) => g.kind === 'optional'), str = m.goals.filter((g) => g.kind === 'stretch');
-      const prev = m.order === 9 || m.order === 12 ? MISSION_BY_ID['duplicate-ghost'] : CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
+      const prev = m.order === 9 || m.order === 12 || m.order === 15 || m.order === 16 ? MISSION_BY_ID['duplicate-ghost'] : CAMPAIGN_MISSIONS.find((x) => x.order === m.order - 1);
       const status = rec?.completed ? `<span class="chip good">✓ Completed · best ${rec.best}/100</span>` : unlocked ? '<span class="chip info">Available</span>' : `<span class="chip warn">🔒 Locked: complete ${esc(prev?.title ?? 'the tutorial')}</span>`;
       return `<div class="mcard ${unlocked ? '' : 'locked'}"><h3>${m.order ? m.order + '. ' : ''}${esc(m.title)} ${status}</h3><div class="small">${esc(m.tagline)}</div><div class="small"><i>${esc(m.theme)}</i></div>
         ${prim.length ? `<div class="small"><b>Primary objectives (${rec ? rec.primary.length : 0}/${prim.length})</b><ul>${prim.map((g) => `<li>${rec?.primary.includes(g.id) ? '✓' : '○'} ${esc(g.text)}</li>`).join('')}</ul></div>` : ''}
@@ -243,6 +245,7 @@ export class UI {
     void this.refreshFabric();
     this.renderHud(); this.renderBelt(); this.renderInspect(); this.renderLog(); this.applySettings();
     state.speed = 1; scene.team.setCrew(settings.data.team);
+    this.blue = new BlueLanternView(this.root, { state, toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; }, openMap: () => { this.blue?.close(); this.blueprint?.open('incident'); } });
     this.access = new AccessReviewView(this.root, { toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
     this.board = new IncidentBoardView(this.root, { state, runner, scene, toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; }, openMap: () => this.blueprint?.open('incident'), openDialog: (d) => this.openDialog(d) });
     this.blueprint = new BlueprintView(this.root, { state, runner, scene, openBoard: () => this.board?.open(), toast: (h, t) => this.toast(h, t), pause: () => { state.paused = true; }, resume: () => { if (!this.pauseOpen && !this.dialogOpen) state.paused = false; } });
@@ -255,7 +258,7 @@ export class UI {
 
   detachMission(): void {
     this.unsub.forEach((u) => u()); this.unsub = [];
-    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.board?.close(); this.board = null; this.access?.close(); this.access = null; this.teamPanel = null; document.body.classList.remove('team-open');
+    clearInterval(this.mmTimer); clearInterval(this.fabTimer); this.blueprint?.close(); this.blueprint = null; this.board?.close(); this.board = null; this.access?.close(); this.access = null; this.blue?.close(); this.blue = null; this.teamPanel = null; document.body.classList.remove('team-open');
     this.hud?.remove(); this.hud = null; this.state = null; this.runner = null; this.scene = null; this.dialogOpen = false; this.pauseOpen = false;
     $(this.root, '#dialog')?.remove(); $(this.root, '#panelmodal')?.remove();
   }
@@ -294,6 +297,7 @@ export class UI {
     if (this.blueprint?.isOpen) { this.blueprint.close(); return; }
     if (this.board?.isOpen) { this.board.close(); return; }
     if (this.access?.isOpen) { this.access.close(); return; }
+    if (this.blue?.isOpen) { this.blue.close(); return; }
     if (this.pauseOpen) { this.pauseOpen = false; this.clearScreen(); this.state.paused = false; return; }
     this.pauseOpen = true; this.state.paused = true;
     const s = this.showScreen(`<div class="card"><h2>Paused</h2><p>The incident clock is stopped.</p>
@@ -634,7 +638,11 @@ export class UI {
   openPanel(kind: 'map' | 'log' | 'fabric' | 'blueprint' | 'board' | 'access'): void {
     if (!this.hud || !this.state) return;
     if (kind === 'access') { if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen || this.board?.isOpen) return; this.access?.open(); return; }
-    if (kind === 'board') { if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen) return; this.board?.toggle(); return; }
+    if (kind === 'board') {
+      if (this.dialogOpen || this.pauseOpen || this.blueprint?.isOpen) return;
+      if (this.state.mission.id.startsWith('blue-lantern')) { if (this.blue?.isOpen) this.blue.close(); else this.blue?.open('board'); return; }
+      this.board?.toggle(); return;
+    }
     if (kind === 'blueprint') { if (this.dialogOpen || this.pauseOpen) return; this.blueprint?.toggle(); return; }
     if (kind === 'log') { $(this.hud, '#logpanel')!.classList.toggle('hidden'); return; }
     if (kind === 'map') { const w = $(this.hud, '#minimap-wrap')!; if (document.body.classList.contains('phone-simple')) w.classList.toggle('force-open'); else w.classList.toggle('hidden'); return; }
@@ -680,6 +688,7 @@ export class UI {
 
   private openDialog(d: DialogSpec): void {
     const st = this.state, runner = this.runner; if (!st || !runner) return;
+    if (d.type === 'emergency') { sfx.click(); this.blue?.open(d.tab as 'board'); return; }
     $(this.root, '#dialog')?.remove();
     const wrap = el('div', { id: 'dialog', class: 'screen' }); this.root.appendChild(wrap);
     this.dialogOpen = true; st.paused = true;

@@ -348,3 +348,20 @@ body.team-open #passes, body.team-open #legend { display: none; }
 .att .av svg { width: 44px; height: 44px; border-radius: 50%; }
 .att .says { margin: 4px 0 0; font-style: italic; }
 .options .backers { color: #9DE3B1; }
+
+/* Blue Lantern: emergency payment continuity board */
+.bl .bl-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 2px 12px; display: block; }
+.bl-who { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 6px 0; } .bl-who select { max-width: 100%; }
+.bl-fb { border-radius: 10px; padding: 8px 12px; margin: 6px 0; border: 1px solid var(--line); background: #132136; } .bl-fb.good { border-color: var(--mint); } .bl-fb.warn { border-color: var(--amber); } .bl-fb.bad { border-color: var(--coral); }
+.bl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.bl-card summary { cursor: pointer; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .bl-card.done { border-color: var(--mint); } .bl-card.ready { border-color: var(--amber); } .bl-card.blocked { opacity: .7; }
+.bl-hist { margin: 4px 0 4px 18px; padding: 0; } .bl-hist li { margin: 2px 0; } .bl-hist time { opacity: .65; font-variant-numeric: tabular-nums; }
+.bl-note { border-left: 4px solid var(--amber); padding: 4px 10px; background: #1a2a40; }
+.bl-chk { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.bl-t td, .bl-t th { vertical-align: top; }
+.bl-conn { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; } .bl-conn.ok { border-color: var(--mint); }
+.bl-accts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .bl-acct { display: block; padding: 10px; border: 2px solid #35507a; border-radius: 12px; background: #16304f; } .bl-acct.no { border-color: var(--coral); opacity: .9; }
+.bl-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; } .bl-tray { min-height: 90px; margin: 6px 0; }
+.bl .good { color: var(--mint); } .bl .bad { color: var(--coral); }
+@media (max-width: 760px) { .bl-conn, .bl-accts { grid-template-columns: 1fr; } }
+.bl { background: #0b1626; } .bl .pcard select { width: 100%; max-width: 100%; box-sizing: border-box; } .bl .zone { min-width: 0; } .bl .bl-who select { width: auto; }

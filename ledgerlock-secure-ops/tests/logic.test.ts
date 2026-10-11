@@ -1196,3 +1196,14 @@ describe('Blue Lantern: emergency payment continuity', () => {
       expect(standFor(t, from, passes), t).not.toBeNull();
   });
 });
+
+describe('Blue Lantern campaign placement', () => {
+  it('both Blue Lantern missions open once the tutorial is done, and not before', () => {
+    const mem = new Map<string, string>(); const c = new Campaign({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) });
+    const bl = MISSIONS.filter((m) => m.id.startsWith('blue-lantern'));
+    expect(bl).toHaveLength(2);
+    for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(false);
+    (c.data.missions as any)['duplicate-ghost'] = { completed: true };
+    for (const m of bl) expect(c.isUnlocked(m, MISSIONS)).toBe(true);
+  });
+});

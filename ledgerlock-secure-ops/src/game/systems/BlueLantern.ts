@@ -390,6 +390,7 @@ export class BlueLantern {
     const bad = this.may(role, 'secure_ops'); if (bad) return bad;
     const r = this.d.recon[id]; if (!r) return res(false, 'That item was not submitted.');
     if (r.ack !== 'Accepted' || r.bank !== 'Debited') return res(false, 'The ledger is only updated once the provider has accepted and the bank feed shows the debit.');
+    for (const e of ['Provider acknowledgement: Accepted', 'Bank feed: debited', 'AP invoice and batch reference match']) if (!r.evidence.includes(e)) r.evidence.push(e);
     r.ledger = 'Posted'; this.note('secure_ops', `Finance Core now shows ${id} as posted, matching the acknowledgement and the bank debit.`, 'good', 'reconcile'); return res(true, 'Ledger posted.');
   }
   decide(role: BLRole, id: string, decision: NonNullable<Recon['decision']>): Result {
